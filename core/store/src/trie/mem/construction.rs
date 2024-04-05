@@ -1,8 +1,9 @@
-use super::arena::Arena;
-use super::node::MemTrieNodeId;
+use super::arena::{Arena, ArenaMemory};
+use super::node::{MemTrieNodeId, MemTrieNodeView};
 use crate::trie::mem::node::InputMemTrieNode;
 use crate::NibbleSlice;
 use near_primitives::state::FlatStateValue;
+use tracing::info;
 
 /// Algorithm to construct a trie from a given stream of sorted leaf values.
 ///
@@ -61,9 +62,11 @@ use near_primitives::state::FlatStateValue;
 //
 // As the bottom two segments are no longer part of the right-most path, they
 // are converted to concrete TrieMemNodeId's.
-pub struct TrieConstructor<'a> {
+pub struct TrieConstructor<'a, 'env: 'a> {
     arena: &'a mut Arena,
     segments: Vec<TrieConstructionSegment>,
+    handles: Vec<std::thread::ScopedJoinHandle<'a, ()>>,
+    scope: &'a std::thread::Scope<'a, 'env>,
 }
 
 /// A segment of the rightmost path of the trie under construction, as
@@ -139,13 +142,13 @@ impl TrieConstructionSegment {
     }
 }
 
-impl<'a> TrieConstructor<'a> {
-    pub fn new(arena: &'a mut Arena) -> Self {
-        Self { arena, segments: vec![] }
+impl<'a, 'env: 'a> TrieConstructor<'a, 'env> {
+    pub fn new(arena: &'a mut Arena, scope: &'a std::thread::Scope<'a, 'env>) -> Self {
+        Self { arena, segments: vec![], handles: vec![], scope }
     }
 
     /// Encodes the bottom-most segment into a node, and pops it off the stack.
-    fn pop_segment(&mut self) {
+    fn pop_segment(&'a mut self) -> MemTrieNodeId {
         let segment = self.segments.pop().unwrap();
         let node = segment.into_node(self.arena);
         let parent = self.segments.last_mut().unwrap();
@@ -155,11 +158,49 @@ impl<'a> TrieConstructor<'a> {
             assert!(parent.child.is_none());
             parent.child = Some(node);
         }
+        node
+    }
+
+    const MEMORY_THRESHOLD_FOR_SPAWN_COMPUTE_HASH: u64 = 1024 * 1024;
+
+    fn try_compute_hash(&'a mut self, parent: MemTrieNodeId) {
+        let memory = self.arena.memory();
+        let parent_view = parent.as_ptr(memory).view();
+        let parent_memory_usage = parent_view.memory_usage();
+        if parent_memory_usage <= Self::MEMORY_THRESHOLD_FOR_SPAWN_COMPUTE_HASH {
+            return;
+        }
+        match parent_view {
+            MemTrieNodeView::Extension { child, .. } => {
+                self.try_spawn_compute_hash(child.id());
+            }
+            MemTrieNodeView::Branch { children, .. } => {
+                for child in children.iter() {
+                    self.try_spawn_compute_hash(child.id());
+                }
+            }
+            MemTrieNodeView::BranchWithValue { children, .. } => {
+                for child in children.iter() {
+                    self.try_spawn_compute_hash(child.id());
+                }
+            }
+            _ => (),
+        }
+    }
+
+    fn try_spawn_compute_hash(&'a mut self, node: MemTrieNodeId) {
+        let view = node.as_ptr(self.arena.memory()).view();
+        if view.memory_usage() < Self::MEMORY_THRESHOLD_FOR_SPAWN_COMPUTE_HASH {
+            let mut node_ptr = node.as_ptr_mut(self.arena.memory_mut());
+            self.handles.push(self.scope.spawn(move || {
+                node_ptr.compute_hash_recursively();
+            }));
+        }
     }
 
     /// Adds a leaf to the trie. The key must be greater than all previous keys
     /// inserted.
-    pub fn add_leaf(&mut self, key: &[u8], value: FlatStateValue) {
+    pub fn add_leaf(&'a mut self, key: &[u8], value: FlatStateValue) {
         let mut nibbles = NibbleSlice::new(key);
         let mut i = 0;
         // We'll go down the segments to find where our nibbles deviate.
@@ -188,7 +229,8 @@ impl<'a> TrieConstructor<'a> {
             // We can already pop off all the extra segments below it, as they
             // have no chance to be relevant to the leaf we're inserting.
             while i < self.segments.len() - 1 {
-                self.pop_segment();
+                let new_node = self.pop_segment();
+                self.try_compute_hash(new_node);
             }
 
             // If the deviation happens in the middle of a segment, i.e. we have
@@ -249,7 +291,8 @@ impl<'a> TrieConstructor<'a> {
                     self.segments.push(segment);
                     // The bottom segment is no longer relevant to our new leaf,
                     // so pop that off.
-                    self.pop_segment();
+                    let new_node = self.pop_segment();
+                    self.try_compute_hash(new_node);
                 } else {
                     // If the old segment was an extension with just 1 nibble,
                     // then that segment is no longer needed. We can add the old
@@ -313,6 +356,8 @@ impl<'a> TrieConstructor<'a> {
         while self.segments.len() > 1 {
             self.pop_segment();
         }
+        info!(target: "memtrie", "Spawned compute hash thread for {} subtrees", self.handles.len());
+        self.handles.into_iter().for_each(|h| h.join().unwrap());
         self.segments.into_iter().next().map(|segment| segment.into_node(self.arena))
     }
 }
