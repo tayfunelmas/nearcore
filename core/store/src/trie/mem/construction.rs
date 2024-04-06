@@ -62,11 +62,11 @@ use tracing::info;
 //
 // As the bottom two segments are no longer part of the right-most path, they
 // are converted to concrete TrieMemNodeId's.
-pub struct TrieConstructor<'a, 'env: 'a> {
+pub struct TrieConstructor<'a, 'scope, 'env: 'scope> {
     arena: &'a mut Arena,
     segments: Vec<TrieConstructionSegment>,
-    handles: Vec<std::thread::ScopedJoinHandle<'a, ()>>,
-    scope: &'a std::thread::Scope<'a, 'env>,
+    handles: Vec<std::thread::ScopedJoinHandle<'scope, ()>>,
+    scope: &'scope std::thread::Scope<'scope, 'env>,
 }
 
 /// A segment of the rightmost path of the trie under construction, as
@@ -142,13 +142,13 @@ impl TrieConstructionSegment {
     }
 }
 
-impl<'a, 'env: 'a> TrieConstructor<'a, 'env> {
-    pub fn new(arena: &'a mut Arena, scope: &'a std::thread::Scope<'a, 'env>) -> Self {
+impl<'a, 'scope, 'env: 'scope> TrieConstructor<'a, 'scope, 'env> {
+    pub fn new(arena: &'a mut Arena, scope: &'scope std::thread::Scope<'scope, 'env>) -> Self {
         Self { arena, segments: vec![], handles: vec![], scope }
     }
 
     /// Encodes the bottom-most segment into a node, and pops it off the stack.
-    fn pop_segment(&'a mut self) -> MemTrieNodeId {
+    fn pop_segment(&mut self) -> MemTrieNodeId {
         let segment = self.segments.pop().unwrap();
         let node = segment.into_node(self.arena);
         let parent = self.segments.last_mut().unwrap();
@@ -163,7 +163,7 @@ impl<'a, 'env: 'a> TrieConstructor<'a, 'env> {
 
     const MEMORY_THRESHOLD_FOR_SPAWN_COMPUTE_HASH: u64 = 1024 * 1024;
 
-    fn try_compute_hash(&'a mut self, parent: MemTrieNodeId) {
+    fn try_compute_hash(&mut self, parent: MemTrieNodeId) {
         let memory = self.arena.memory();
         let parent_view = parent.as_ptr(memory).view();
         let parent_memory_usage = parent_view.memory_usage();
@@ -188,7 +188,7 @@ impl<'a, 'env: 'a> TrieConstructor<'a, 'env> {
         }
     }
 
-    fn try_spawn_compute_hash(&'a mut self, node: MemTrieNodeId) {
+    fn try_spawn_compute_hash(&mut self, node: MemTrieNodeId) {
         let view = node.as_ptr(self.arena.memory()).view();
         if view.memory_usage() < Self::MEMORY_THRESHOLD_FOR_SPAWN_COMPUTE_HASH {
             let mut node_ptr = node.as_ptr_mut(self.arena.memory_mut());
@@ -200,7 +200,7 @@ impl<'a, 'env: 'a> TrieConstructor<'a, 'env> {
 
     /// Adds a leaf to the trie. The key must be greater than all previous keys
     /// inserted.
-    pub fn add_leaf(&'a mut self, key: &[u8], value: FlatStateValue) {
+    pub fn add_leaf(&mut self, key: &[u8], value: FlatStateValue) {
         let mut nibbles = NibbleSlice::new(key);
         let mut i = 0;
         // We'll go down the segments to find where our nibbles deviate.
