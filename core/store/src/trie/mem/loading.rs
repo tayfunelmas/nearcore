@@ -210,6 +210,7 @@ pub fn load_trie_from_flat_state_and_delta(
     store: &Store,
     shard_uid: ShardUId,
     state_root: Option<StateRoot>,
+    parallel: bool,
 ) -> Result<MemTries, StorageError> {
     debug!(target: "memtrie", %shard_uid, "Loading base trie from flat state...");
     let flat_head = match get_flat_storage_status(&store, shard_uid)? {
@@ -227,9 +228,11 @@ pub fn load_trie_from_flat_state_and_delta(
         None => get_state_root(store, flat_head.hash, shard_uid)?,
     };
 
-    let mut mem_tries =
-        load_trie_from_flat_state_parallel(&store, shard_uid, state_root, flat_head.height)
-            .unwrap();
+    let mut mem_tries = if parallel {
+        load_trie_from_flat_state_parallel(&store, shard_uid, state_root, flat_head.height).unwrap()
+    } else {
+        load_trie_from_flat_state_original(&store, shard_uid, state_root, flat_head.height).unwrap()
+    };
 
     debug!(target: "memtrie", %shard_uid, "Loading flat state deltas...");
     // We load the deltas in order of height, so that we always have the previous state root

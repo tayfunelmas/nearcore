@@ -18,6 +18,7 @@ use std::time::Duration;
 pub struct LoadMemTrieCommand {
     #[clap(long, use_value_delimiter = true, value_delimiter = ',')]
     shard_id: Option<Vec<ShardId>>,
+    parallel: bool,
 }
 
 /// cargo run -p neard --profile dev-release -- --home /home/elmas/.near/localnet/node0/ database load-mem-trie --shard-id 0,1,2
@@ -61,7 +62,9 @@ impl LoadMemTrieCommand {
                 .context("could not create the transaction runtime")?;
 
         println!("Loading memtries for shards {:?}...", selected_shard_uids);
-        runtime.get_tries().load_mem_tries_for_enabled_shards(&selected_shard_uids)?;
+        runtime
+            .get_tries()
+            .load_mem_tries_for_enabled_shards(&selected_shard_uids, self.parallel)?;
         println!("Finished loading memtries, press Ctrl-C to exit.");
         std::thread::sleep(Duration::from_secs(10_000_000_000));
         Ok(())
