@@ -34,7 +34,7 @@ pub fn load_trie_from_flat_state_original(
     let mut tries = MemTries::new(shard_uid);
 
     tries.construct_root(block_height, |arena| -> Result<Option<MemTrieNodeId>, StorageError> {
-        info!(target: "memtrie", shard_uid=%shard_uid, "Loading trie from flat state...");
+        info!(target: "memtrie", shard_uid=%shard_uid, "[Original] Loading trie from flat state...");
         let load_start = Instant::now();
         let mut recon = TrieConstructor::new(arena);
         let mut num_keys_loaded = 0;
@@ -102,7 +102,7 @@ pub fn load_trie_from_flat_state_parallel(
     let mut tries = MemTries::new(shard_uid);
 
     tries.construct_root(block_height, |arena| -> Result<Option<MemTrieNodeId>, StorageError> {
-        info!(target: "memtrie", shard_uid=%shard_uid, "Loading trie from flat state...");
+        info!(target: "memtrie", shard_uid=%shard_uid, "[Parallel] Loading trie from flat state...");
         let load_start = Instant::now();
         let mut num_keys_loaded: u64 = 0;
         let mut num_subtrees: u64 = 0;
