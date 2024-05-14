@@ -18,6 +18,7 @@ use std::time::Duration;
 pub struct LoadMemTrieCommand {
     #[clap(long, use_value_delimiter = true, value_delimiter = ',')]
     shard_id: Option<Vec<ShardId>>,
+    #[clap(long)]
     parallel: bool,
 }
 
