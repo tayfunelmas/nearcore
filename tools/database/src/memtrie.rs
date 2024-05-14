@@ -14,6 +14,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 /// Command to load an in-memory trie for research purposes.
+/// Example usage: neard database load-mem-trie --shard-id 0,1,2
 #[derive(clap::Parser)]
 pub struct LoadMemTrieCommand {
     #[clap(long, use_value_delimiter = true, value_delimiter = ',')]
@@ -54,18 +55,15 @@ impl LoadMemTrieCommand {
             Some(shard_ids) => all_shard_uids
                 .iter()
                 .filter(|uid| shard_ids.contains(&uid.shard_id()))
-                .map(|uid| uid.clone())
+                .map(|uid| *uid)
                 .collect(),
         };
 
-        let runtime =
-            NightshadeRuntime::from_config(home, store.clone(), &near_config, epoch_manager)
-                .context("could not create the transaction runtime")?;
+        let runtime = NightshadeRuntime::from_config(home, store, &near_config, epoch_manager)
+            .context("could not create the transaction runtime")?;
 
         println!("Loading memtries for shards {:?}...", selected_shard_uids);
-        runtime
-            .get_tries()
-            .load_mem_tries_for_enabled_shards(&selected_shard_uids, self.parallel)?;
+        runtime.get_tries().load_mem_tries_for_enabled_shards(&selected_shard_uids, self.parallel)?;
         println!("Finished loading memtries, press Ctrl-C to exit.");
         std::thread::sleep(Duration::from_secs(10_000_000_000));
         Ok(())
