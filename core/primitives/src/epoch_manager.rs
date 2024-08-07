@@ -159,6 +159,7 @@ impl AllEpochConfig {
 
     pub fn for_protocol_version(&self, protocol_version: ProtocolVersion) -> EpochConfig {
         if self.config_store.is_some() {
+            tracing::info!("TAYFUN: Getting epoch config for protocol version {}", protocol_version);
             self.config_store.as_ref().unwrap().get_config(protocol_version).as_ref().clone()
         } else {
             self.generate_epoch_config(protocol_version)
