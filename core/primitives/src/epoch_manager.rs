@@ -129,6 +129,7 @@ impl AllEpochConfig {
         chain_id: &str,
         test_overrides: Option<AllEpochConfigTestOverrides>,
     ) -> Self {
+        tracing::info!("TAYFUN Genesis protocol version: {}", genesis_protocol_version);
         // Use the config store only for production configs and outside of tests.
         let config_store = if use_production_config && test_overrides.is_none() {
             EpochConfigStore::for_chain_id(chain_id)
@@ -147,7 +148,7 @@ impl AllEpochConfig {
         // Thus, by making sure that the generated and store configs match for the genesis, we complement the unittests, which
         // check that the generated and stored configs match for the versions after the genesis.
         if config_store.is_some() {
-            debug_assert_eq!(
+            assert_eq!(
                 config_store.as_ref().unwrap().get_config(genesis_protocol_version).as_ref(),
                 &all_epoch_config.generate_epoch_config(genesis_protocol_version),
                 "Provided genesis EpochConfig for protocol version {} does not match the stored config", genesis_protocol_version
