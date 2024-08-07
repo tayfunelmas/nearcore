@@ -148,11 +148,12 @@ impl AllEpochConfig {
         // Thus, by making sure that the generated and store configs match for the genesis, we complement the unittests, which
         // check that the generated and stored configs match for the versions after the genesis.
         if config_store.is_some() {
-            assert_eq!(
-                config_store.as_ref().unwrap().get_config(genesis_protocol_version).as_ref(),
-                &all_epoch_config.generate_epoch_config(genesis_protocol_version),
-                "Provided genesis EpochConfig for protocol version {} does not match the stored config", genesis_protocol_version
-            );
+            for protocol_version in genesis_protocol_version..=PROTOCOL_VERSION {
+                tracing::info!("TAYFUN: Checking version: {}", protocol_version);
+                let stored_config = config_store.get_config(protocol_version);
+                let expected_config = all_epoch_config.generate_epoch_config(protocol_version);
+                assert_eq!(*stored_config.as_ref(), expected_config);
+            }
         }
         all_epoch_config
     }
