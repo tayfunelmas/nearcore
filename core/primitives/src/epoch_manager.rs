@@ -11,6 +11,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use near_primitives_core::checked_feature;
 use near_primitives_core::hash::CryptoHash;
 use near_primitives_core::types::BlockHeight;
+use near_primitives_core::version::PROTOCOL_VERSION;
 use near_schema_checker_lib::ProtocolSchema;
 use smart_default::SmartDefault;
 use std::collections::{BTreeMap, HashMap};
@@ -150,7 +151,7 @@ impl AllEpochConfig {
         if config_store.is_some() {
             for protocol_version in genesis_protocol_version..=PROTOCOL_VERSION {
                 tracing::info!("TAYFUN: Checking version: {}", protocol_version);
-                let stored_config = config_store.get_config(protocol_version);
+                let stored_config = config_store.as_ref().unwrap().get_config(protocol_version);
                 let expected_config = all_epoch_config.generate_epoch_config(protocol_version);
                 assert_eq!(*stored_config.as_ref(), expected_config);
             }
