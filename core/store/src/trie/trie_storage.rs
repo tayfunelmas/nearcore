@@ -557,7 +557,7 @@ fn read_node_from_db(
     let val = store
         .get(DBCol::State, key.as_ref())
         .map_err(|_| StorageError::StorageInternalError)?
-        .ok_or(StorageError::MissingTrieValue(MissingTrieValueContext::TrieStorage, *hash))?;
+        .unwrap();
     Ok(val.into())
 }
 
