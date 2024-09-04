@@ -28,11 +28,16 @@ static LOCALNET: WalletContract =
 /// Get wallet contract code for different Near chains.
 pub fn wallet_contract(chain_id: &str, protocol_version: ProtocolVersion) -> Arc<ContractCode> {
     match chain_id {
-        chains::MAINNET => MAINNET.read_contract(),
+        chains::MAINNET => {
+            tracing::info!("Reading mainnet contract.");
+            MAINNET.read_contract()
+        },
         chains::TESTNET => {
             if protocol_version < NEW_WALLET_CONTRACT_VERSION {
+                tracing::info!("Reading old testnet contract.");
                 OLD_TESTNET.read_contract()
             } else {
+                tracing::info!("Reading new testnet contract.");
                 TESTNET.read_contract()
             }
         }
@@ -49,8 +54,10 @@ pub fn wallet_contract_magic_bytes(
         chains::MAINNET => MAINNET.magic_bytes(),
         chains::TESTNET => {
             if protocol_version < NEW_WALLET_CONTRACT_VERSION {
+                tracing::info!("Magicbytes for old testnet contract.");
                 OLD_TESTNET.magic_bytes()
             } else {
+                tracing::info!("Magicbytes for new testnet contract.");
                 TESTNET.magic_bytes()
             }
         }
@@ -68,6 +75,7 @@ pub fn code_hash_matches_wallet_contract(
     let magic_bytes = wallet_contract_magic_bytes(&chain_id, protocol_version);
 
     if code_hash == magic_bytes.hash() {
+        tracing::info!("Hash matched magic bytes.");
         return true;
     }
 
