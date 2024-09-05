@@ -221,7 +221,9 @@ impl ProtocolFeature {
             ProtocolFeature::YieldExecution => 67,
             ProtocolFeature::CongestionControl
             | ProtocolFeature::RemoveAccountWithLongStorageKey => 68,
-            ProtocolFeature::StatelessValidation => 69,
+            // DO NOT MERGE
+            ProtocolFeature::StatelessValidation
+            | ProtocolFeature::ChunkEndorsementsInBlockHeader => 69,
             ProtocolFeature::BLS12381 | ProtocolFeature::EthImplicitAccounts => 70,
             ProtocolFeature::FixMinStakeRatio => 71,
             ProtocolFeature::IncreaseStorageProofSizeSoftLimit
@@ -244,13 +246,6 @@ impl ProtocolFeature {
             // TODO(#11201): When stabilizing this feature in mainnet, also remove the temporary code
             // that always enables this for mocknet (see config_mocknet function).
             ProtocolFeature::ShuffleShardAssignments => 143,
-
-            // Features that should not be included in Nightly yet:
-
-            // NOTE): DO NOT include this in Nightly yet, because there are some tests that assume that they
-            // always operate on the latest BlockHeader version (which is V4 for stable version and V5 for nightly).
-            // This is not possible until this feature is stabilized or modify all those tests.
-            ProtocolFeature::ChunkEndorsementsInBlockHeader => 200,
         }
     }
 

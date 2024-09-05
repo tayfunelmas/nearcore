@@ -837,7 +837,7 @@ impl EpochManager {
         let current_hash = *block_info.hash();
         let mut store_update = self.store.store_update();
         // Check that we didn't record this block yet.
-        if !self.has_block_info(&current_hash)? {
+        // if !self.has_block_info(&current_hash)? {
             if block_info.is_genesis() {
                 // This is genesis block, we special case as new epoch.
                 assert_eq!(block_info.proposals_iter().len(), 0);
@@ -931,7 +931,7 @@ impl EpochManager {
                     self.finalize_epoch(&mut store_update, &block_info, &current_hash, rng_seed)?;
                 }
             }
-        }
+        // }
         Ok(store_update)
     }
 
