@@ -226,7 +226,7 @@ fn get_block_info(
         if ProtocolFeature::StatelessValidation.enabled(protocol_version)
             && header.chunk_endorsements().is_none()
         {
-            let block = chain_store.get_block(header.hash()).context("Failed to get block for endorsements")?;
+            let block = chain_store.get_block(header.hash())?;
             let chunks = block.chunks();
 
             let endorsement_signatures = block.chunk_endorsements().to_vec();
@@ -282,8 +282,10 @@ fn create_replay_store(home_dir: &Path, near_config: &NearConfig) -> Store {
     let storage = store_opener.open_in_mode(Mode::ReadOnly).unwrap();
 
     let read_db = if storage.has_cold() {
+        println!("Using COLD DB");
         storage.get_split_db().unwrap()
     } else {
+        println!("Using HOT DB");
         storage.into_inner(Temperature::Hot)
     };
     let write_db = TestDB::new();
