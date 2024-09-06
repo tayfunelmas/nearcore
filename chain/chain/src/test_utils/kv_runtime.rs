@@ -1,6 +1,6 @@
 use super::ValidatorSchedule;
 use crate::types::{
-    ApplyChunkBlockContext, ApplyChunkResult, ApplyChunkShardContext, ApplyResultForResharding,
+    ApplyChunkBlockContext, ApplyChunkResult, ApplyChunkShardContext,
     PrepareTransactionsBlockContext, PrepareTransactionsChunkContext, PreparedTransactions,
     RuntimeAdapter, RuntimeStorageConfig,
 };
@@ -31,7 +31,9 @@ use near_primitives::shard_layout;
 use near_primitives::shard_layout::{ShardLayout, ShardUId};
 use near_primitives::sharding::{ChunkHash, ShardChunkHeader};
 use near_primitives::state_part::PartId;
-use near_primitives::stateless_validation::chunk_endorsement::ChunkEndorsementV1;
+use near_primitives::stateless_validation::chunk_endorsement::{
+    ChunkEndorsementV1, ChunkEndorsementV2,
+};
 use near_primitives::stateless_validation::partial_witness::PartialEncodedStateWitness;
 use near_primitives::stateless_validation::validator_assignment::ChunkValidatorAssignments;
 use near_primitives::transaction::{
@@ -41,7 +43,7 @@ use near_primitives::transaction::{
 use near_primitives::types::validator_stake::ValidatorStake;
 use near_primitives::types::{
     AccountId, ApprovalStake, Balance, BlockHeight, EpochHeight, EpochId, Nonce, NumShards,
-    ShardId, StateChangesForResharding, StateRoot, StateRootNode, ValidatorInfoIdentifier,
+    ShardId, StateRoot, StateRootNode, ValidatorInfoIdentifier,
 };
 use near_primitives::version::{ProtocolFeature, ProtocolVersion, PROTOCOL_VERSION};
 use near_primitives::views::{
@@ -829,8 +831,9 @@ impl EpochManagerAdapter for MockEpochManager {
         Ok(Default::default())
     }
 
-    fn epoch_sync_init_epoch_manager(
+    fn init_after_epoch_sync(
         &self,
+        _store_update: &mut StoreUpdate,
         _prev_epoch_first_block_info: BlockInfo,
         _prev_epoch_last_block_info: BlockInfo,
         _prev_epoch_prev_last_block_info: BlockInfo,
@@ -946,6 +949,13 @@ impl EpochManagerAdapter for MockEpochManager {
         &self,
         _chunk_header: &ShardChunkHeader,
         _endorsement: &ChunkEndorsementV1,
+    ) -> Result<bool, Error> {
+        Ok(true)
+    }
+
+    fn verify_chunk_endorsement_signature(
+        &self,
+        _endorsement: &ChunkEndorsementV2,
     ) -> Result<bool, Error> {
         Ok(true)
     }
@@ -1471,16 +1481,5 @@ impl RuntimeAdapter for KeyValueRuntime {
         _parent_hash: &CryptoHash,
     ) -> Result<bool, Error> {
         Ok(false)
-    }
-
-    fn apply_update_to_children_states(
-        &self,
-        _block_hash: &CryptoHash,
-        _block_height: BlockHeight,
-        _state_roots: HashMap<ShardUId, StateRoot>,
-        _next_shard_layout: &ShardLayout,
-        _state_changes: StateChangesForResharding,
-    ) -> Result<Vec<ApplyResultForResharding>, Error> {
-        Ok(vec![])
     }
 }

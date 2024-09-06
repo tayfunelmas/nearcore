@@ -656,8 +656,8 @@ fn invalid_blocks_common(is_requested: bool) {
             );
             // Send block with invalid chunk mask
             let mut block = valid_block.clone();
-            block.mut_header().get_mut().inner_rest.chunk_mask = vec![];
-            block.mut_header().get_mut().init();
+            block.mut_header().set_chunk_mask(vec![]);
+            block.mut_header().init();
             actor_handles.client_actor.do_send(
                 BlockResponse {
                     block: block.clone(),
@@ -671,9 +671,8 @@ fn invalid_blocks_common(is_requested: bool) {
             #[cfg(feature = "protocol_feature_reject_blocks_with_outdated_protocol_version")]
             {
                 let mut block = valid_block.clone();
-                block.mut_header().get_mut().inner_rest.latest_protocol_version =
-                    PROTOCOL_VERSION - 1;
-                block.mut_header().get_mut().init();
+                block.mut_header().set_latest_protocol_version(PROTOCOL_VERSION - 1);
+                block.mut_header().init();
                 actor_handles.client_actor.do_send(
                     BlockResponse {
                         block: block.clone(),
@@ -721,8 +720,8 @@ fn invalid_blocks_common(is_requested: bool) {
             );
             if is_requested {
                 let mut block3 = block2;
-                block3.mut_header().get_mut().inner_rest.chunk_headers_root = hash(&[1]);
-                block3.mut_header().get_mut().init();
+                block3.mut_header().set_chunk_headers_root(hash(&[1]));
+                block3.mut_header().init();
                 actor_handles.client_actor.do_send(
                     BlockResponse {
                         block: block3.clone(),
@@ -802,17 +801,12 @@ fn ban_peer_for_invalid_block_common(mode: InvalidBlockMode) {
                                 match mode {
                                     InvalidBlockMode::InvalidHeader => {
                                         // produce an invalid block with invalid header.
-                                        block_mut.mut_header().get_mut().inner_rest.chunk_mask =
-                                            vec![];
+                                        block_mut.mut_header().set_chunk_mask(vec![]);
                                         block_mut.mut_header().resign(&validator_signer1);
                                     }
                                     InvalidBlockMode::IllFormed => {
                                         // produce an ill-formed block
-                                        block_mut
-                                            .mut_header()
-                                            .get_mut()
-                                            .inner_rest
-                                            .chunk_headers_root = hash(&[1]);
+                                        block_mut.mut_header().set_chunk_headers_root(hash(&[1]));
                                         block_mut.mut_header().resign(&validator_signer1);
                                     }
                                     InvalidBlockMode::InvalidBlock => {
@@ -826,9 +820,7 @@ fn ban_peer_for_invalid_block_common(mode: InvalidBlockMode) {
 
                                         block_mut
                                             .mut_header()
-                                            .get_mut()
-                                            .inner_rest
-                                            .prev_validator_proposals = proposals;
+                                            .set_prev_validator_proposals(proposals);
                                         block_mut.mut_header().resign(&validator_signer1);
                                     }
                                 }
@@ -1070,8 +1062,9 @@ fn test_time_attack() {
     let signer = client.validator_signer.get().unwrap();
     let genesis = client.chain.get_block_by_height(0).unwrap();
     let mut b1 = TestBlockBuilder::new(Clock::real(), &genesis, signer.clone()).build();
-    b1.mut_header().get_mut().inner_lite.timestamp =
-        (b1.header().timestamp() + Duration::seconds(60)).unix_timestamp_nanos() as u64;
+    let timestamp = b1.header().timestamp();
+    b1.mut_header()
+        .set_timestamp((timestamp + Duration::seconds(60)).unix_timestamp_nanos() as u64);
     b1.mut_header().resign(signer.as_ref());
 
     let _ = client.process_block_test(b1.into(), Provenance::NONE).unwrap();
@@ -1099,7 +1092,7 @@ fn test_invalid_gas_price() {
 
     let genesis = client.chain.get_block_by_height(0).unwrap();
     let mut b1 = TestBlockBuilder::new(Clock::real(), &genesis, signer.clone()).build();
-    b1.mut_header().get_mut().inner_rest.next_gas_price = 0;
+    b1.mut_header().set_next_gas_price(0);
     b1.mut_header().resign(signer.as_ref());
 
     let res = client.process_block_test(b1.into(), Provenance::NONE);
@@ -1143,8 +1136,8 @@ fn test_bad_orphan() {
     {
         // Orphan block with unknown epoch
         let mut block = env.clients[0].produce_block(6).unwrap().unwrap();
-        block.mut_header().get_mut().inner_lite.epoch_id = EpochId(CryptoHash([1; 32]));
-        block.mut_header().get_mut().prev_hash = CryptoHash([1; 32]);
+        block.mut_header().set_epoch_id(EpochId(CryptoHash([1; 32])));
+        block.mut_header().set_prev_hash(CryptoHash([1; 32]));
         block.mut_header().resign(&*signer);
         let res = env.clients[0].process_block_test(block.clone().into(), Provenance::NONE);
         match res {
@@ -1157,8 +1150,8 @@ fn test_bad_orphan() {
     {
         // Orphan block with invalid signature
         let mut block = env.clients[0].produce_block(7).unwrap().unwrap();
-        block.mut_header().get_mut().prev_hash = CryptoHash([1; 32]);
-        block.mut_header().get_mut().init();
+        block.mut_header().set_prev_hash(CryptoHash([1; 32]));
+        block.mut_header().init();
         let res = env.clients[0].process_block_test(block.into(), Provenance::NONE);
         assert_matches!(res.unwrap_err(), Error::InvalidSignature);
     }
@@ -1176,7 +1169,7 @@ fn test_bad_orphan() {
             }
             chunk.hash = ShardChunkHeaderV3::compute_hash(&chunk.inner);
         }
-        block.mut_header().get_mut().prev_hash = CryptoHash([3; 32]);
+        block.mut_header().set_prev_hash(CryptoHash([3; 32]));
         block.mut_header().resign(&*signer);
         let res = env.clients[0].process_block_test(block.into(), Provenance::NONE);
         assert_matches!(res.unwrap_err(), Error::InvalidChunkHeadersRoot);
@@ -1185,8 +1178,8 @@ fn test_bad_orphan() {
         // Orphan block with invalid approvals. Allowed for now.
         let mut block = env.clients[0].produce_block(9).unwrap().unwrap();
         let some_signature = Signature::from_parts(KeyType::ED25519, &[1; 64]).unwrap();
-        block.mut_header().get_mut().inner_rest.approvals = vec![Some(Box::new(some_signature))];
-        block.mut_header().get_mut().prev_hash = CryptoHash([3; 32]);
+        block.mut_header().set_approvals(vec![Some(Box::new(some_signature))]);
+        block.mut_header().set_prev_hash(CryptoHash([3; 32]));
         block.mut_header().resign(&*signer);
         let res = env.clients[0].process_block_test(block.into(), Provenance::NONE);
 
@@ -1202,7 +1195,7 @@ fn test_bad_orphan() {
             chunk.signature = some_signature;
             chunk.hash = ShardChunkHeaderV3::compute_hash(&chunk.inner);
         }
-        block.mut_header().get_mut().prev_hash = CryptoHash([4; 32]);
+        block.mut_header().set_prev_hash(CryptoHash([4; 32]));
         block.mut_header().resign(&*signer);
         let res = env.clients[0].process_block_test(block.into(), Provenance::NONE);
         assert_matches!(res.unwrap_err(), Error::Orphan);
@@ -1210,8 +1203,9 @@ fn test_bad_orphan() {
     {
         // Orphan block that's too far ahead: 20 * epoch_length
         let mut block = block.clone();
-        block.mut_header().get_mut().prev_hash = CryptoHash([3; 32]);
-        block.mut_header().get_mut().inner_lite.height += 2000;
+        block.mut_header().set_prev_hash(CryptoHash([3; 32]));
+        let height = block.header().height();
+        block.mut_header().set_height(height + 2000);
         block.mut_header().resign(&*signer);
         let res = env.clients[0].process_block_test(block.into(), Provenance::NONE);
         assert_matches!(res.unwrap_err(), Error::InvalidBlockHeight(_));
@@ -1264,19 +1258,19 @@ fn test_bad_chunk_mask() {
             let mut chunk_headers: Vec<_> = block.chunks().iter().cloned().collect();
             chunk_headers[0] = chunk_header;
             block.set_chunks(chunk_headers.clone());
-            block.mut_header().get_mut().inner_rest.chunk_headers_root =
-                Block::compute_chunk_headers_root(&chunk_headers).0;
-            block.mut_header().get_mut().inner_rest.chunk_tx_root =
-                Block::compute_chunk_tx_root(&chunk_headers);
-            block.mut_header().get_mut().inner_rest.prev_chunk_outgoing_receipts_root =
-                Block::compute_chunk_prev_outgoing_receipts_root(&chunk_headers);
-            block.mut_header().get_mut().inner_lite.prev_state_root =
-                Block::compute_state_root(&chunk_headers);
-            block.mut_header().get_mut().inner_rest.chunk_mask = vec![true, false];
+            block
+                .mut_header()
+                .set_chunk_headers_root(Block::compute_chunk_headers_root(&chunk_headers).0);
+            block.mut_header().set_chunk_tx_root(Block::compute_chunk_tx_root(&chunk_headers));
+            block.mut_header().set_prev_chunk_outgoing_receipts_root(
+                Block::compute_chunk_prev_outgoing_receipts_root(&chunk_headers),
+            );
+            block.mut_header().set_prev_state_root(Block::compute_state_root(&chunk_headers));
+            block.mut_header().set_chunk_mask(vec![true, false]);
             let mess_with_chunk_mask = height == 4;
             if mess_with_chunk_mask {
                 // On height 4 set the chunk_mask to an invalid value.
-                block.mut_header().get_mut().inner_rest.chunk_mask = vec![false, true];
+                block.mut_header().set_chunk_mask(vec![false, true]);
                 // The original test made sure that block_producer is different from chunk_producer,
                 // so let's make sure that this is still the case using an assert.
                 assert_ne!(block_producer, chunk_producer);
@@ -1875,13 +1869,17 @@ fn test_gc_tail_update() {
     let signer = env.clients[1].validator_signer.get();
     env.clients[1].sync_block_headers(headers, &signer).unwrap();
     // simulate save sync hash block
+    let prev_prev_sync_block = blocks[blocks.len() - 4].clone();
+    let prev_prev_sync_hash = *prev_prev_sync_block.hash();
     let prev_sync_block = blocks[blocks.len() - 3].clone();
     let prev_sync_hash = *prev_sync_block.hash();
     let prev_sync_height = prev_sync_block.header().height();
     let sync_block = blocks[blocks.len() - 2].clone();
     env.clients[1].chain.reset_data_pre_state_sync(*sync_block.hash()).unwrap();
+    env.clients[1].chain.save_block(prev_prev_sync_block.into()).unwrap();
     env.clients[1].chain.save_block(prev_sync_block.into()).unwrap();
     let mut store_update = env.clients[1].chain.mut_chain_store().store_update();
+    store_update.inc_block_refcount(&prev_prev_sync_hash).unwrap();
     store_update.inc_block_refcount(&prev_sync_hash).unwrap();
     store_update.save_block(sync_block.clone());
     store_update.commit().unwrap();
@@ -1895,7 +1893,7 @@ fn test_gc_tail_update() {
         )
         .unwrap();
     env.process_block(1, blocks.pop().unwrap(), Provenance::NONE);
-    assert_eq!(env.clients[1].chain.chain_store().tail().unwrap(), prev_sync_height);
+    assert_eq!(env.clients[1].chain.chain_store().tail().unwrap(), prev_sync_height - 1);
 }
 
 /// Test that transaction does not become invalid when there is some gas price change.
@@ -1989,7 +1987,7 @@ fn test_invalid_block_root() {
     let mut env = TestEnv::default_builder().mock_epoch_managers().build();
     let mut b1 = env.clients[0].produce_block(1).unwrap().unwrap();
     let signer = create_test_signer("test0");
-    b1.mut_header().get_mut().inner_lite.block_merkle_root = CryptoHash::default();
+    b1.mut_header().set_block_merkle_root(CryptoHash::default());
     b1.mut_header().resign(&signer);
     let res = env.clients[0].process_block_test(b1.into(), Provenance::NONE);
     assert_matches!(res.unwrap_err(), Error::InvalidBlockMerkleRoot);
@@ -2171,7 +2169,7 @@ fn test_block_height_processed_orphan() {
     let block = env.clients[0].produce_block(1).unwrap().unwrap();
     let mut orphan_block = block;
     let validator_signer = create_test_signer("test0");
-    orphan_block.mut_header().get_mut().prev_hash = hash(&[1]);
+    orphan_block.mut_header().set_prev_hash(hash(&[1]));
     orphan_block.mut_header().resign(&validator_signer);
     let block_height = orphan_block.header().height();
     let res = env.clients[0].process_block_test(orphan_block.into(), Provenance::NONE);
@@ -2260,21 +2258,21 @@ fn test_validate_chunk_extra() {
         *chunk_header.height_included_mut() = i as BlockHeight + next_height;
         let chunk_headers = vec![chunk_header.clone()];
         block.set_chunks(chunk_headers.clone());
-        block.mut_header().get_mut().inner_rest.chunk_headers_root =
-            Block::compute_chunk_headers_root(&chunk_headers).0;
-        block.mut_header().get_mut().inner_rest.chunk_tx_root =
-            Block::compute_chunk_tx_root(&chunk_headers);
-        block.mut_header().get_mut().inner_rest.prev_chunk_outgoing_receipts_root =
-            Block::compute_chunk_prev_outgoing_receipts_root(&chunk_headers);
-        block.mut_header().get_mut().inner_lite.prev_state_root =
-            Block::compute_state_root(&chunk_headers);
-        block.mut_header().get_mut().inner_rest.chunk_mask = vec![true];
-        block.mut_header().get_mut().inner_lite.prev_outcome_root =
-            Block::compute_outcome_root(block.chunks().iter());
+        block
+            .mut_header()
+            .set_chunk_headers_root(Block::compute_chunk_headers_root(&chunk_headers).0);
+        block.mut_header().set_chunk_tx_root(Block::compute_chunk_tx_root(&chunk_headers));
+        block.mut_header().set_prev_chunk_outgoing_receipts_root(
+            Block::compute_chunk_prev_outgoing_receipts_root(&chunk_headers),
+        );
+        block.mut_header().set_prev_state_root(Block::compute_state_root(&chunk_headers));
+        block.mut_header().set_chunk_mask(vec![true]);
+        let outcome_root = Block::compute_outcome_root(block.chunks().iter());
+        block.mut_header().set_prev_outcome_root(outcome_root);
         let endorsement = ChunkEndorsementV1::new(chunk_header.chunk_hash(), &validator_signer);
         block.set_chunk_endorsements(vec![vec![Some(Box::new(endorsement.signature))]]);
-        block.mut_header().get_mut().inner_rest.block_body_hash =
-            block.compute_block_body_hash().unwrap();
+        let body_hash = block.compute_block_body_hash().unwrap();
+        block.mut_header().set_block_body_hash(body_hash);
         block.mut_header().resign(&validator_signer);
         let res = env.clients[0].process_block_test(block.clone().into(), Provenance::NONE);
         assert_matches!(res.unwrap_err(), near_chain::Error::ChunksMissing(_));
@@ -2302,21 +2300,23 @@ fn test_validate_chunk_extra() {
     assert_eq!(accepted_blocks.len(), 1);
     env.resume_block_processing(block2.hash());
     let accepted_blocks = env.clients[0].finish_block_in_processing(block2.hash());
+    env.propagate_chunk_state_witnesses_and_endorsements(false);
     assert_eq!(accepted_blocks.len(), 1);
-
-    let client = &mut env.clients[0];
 
     // Produce a block on top of block1.
     // Validate that result of chunk execution in `block1` is legit.
+    let client = &mut env.clients[0];
     client
         .chunk_inclusion_tracker
         .prepare_chunk_headers_ready_for_inclusion(
             block1.hash(),
-            client.chunk_endorsement_tracker.as_ref(),
+            &mut client.chunk_endorsement_tracker,
         )
         .unwrap();
     let block = client.produce_block_on(next_height + 2, *block1.hash()).unwrap().unwrap();
     client.process_block_test(block.into(), Provenance::PRODUCED).unwrap();
+    env.propagate_chunk_state_witnesses_and_endorsements(false);
+    let client = &mut env.clients[0];
     let chunks = client
         .chunk_inclusion_tracker
         .get_chunk_headers_ready_for_inclusion(block1.header().epoch_id(), &block1.hash());
@@ -2822,7 +2822,7 @@ fn test_epoch_multi_protocol_version_change() {
         format!("{}={},{}={}", v1_upgrade_time, v1, v2_upgrade_time, v2);
 
     tracing::debug!(target: "test", ?protocol_version_override, "setting the protocol_version_override");
-    std::env::set_var("NEAR_TESTS_PROTOCOL_UPGRADE_OVERRIDE", protocol_version_override);
+    unsafe { std::env::set_var("NEAR_TESTS_PROTOCOL_UPGRADE_OVERRIDE", protocol_version_override) };
 
     let epoch_length = 5;
     let mut genesis = Genesis::test(vec!["test0".parse().unwrap(), "test1".parse().unwrap()], 2);
@@ -2896,7 +2896,7 @@ fn test_epoch_multi_protocol_version_change_epoch_overlap() {
         format!("{}={},{}={}", v1_upgrade_time, v1, v2_upgrade_time, v2);
 
     tracing::debug!(target: "test", ?protocol_version_override, "setting the protocol_version_override");
-    std::env::set_var("NEAR_TESTS_PROTOCOL_UPGRADE_OVERRIDE", protocol_version_override);
+    unsafe { std::env::set_var("NEAR_TESTS_PROTOCOL_UPGRADE_OVERRIDE", protocol_version_override) };
 
     let epoch_length = 5;
     let mut genesis = Genesis::test(vec!["test0".parse().unwrap(), "test1".parse().unwrap()], 2);
@@ -3159,15 +3159,15 @@ fn test_fork_receipt_ids() {
         *chunk_header.height_included_mut() = block.header().height();
         let chunk_headers = vec![chunk_header];
         block.set_chunks(chunk_headers.clone());
-        block.mut_header().get_mut().inner_rest.chunk_headers_root =
-            Block::compute_chunk_headers_root(&chunk_headers).0;
-        block.mut_header().get_mut().inner_rest.chunk_tx_root =
-            Block::compute_chunk_tx_root(&chunk_headers);
-        block.mut_header().get_mut().inner_rest.prev_chunk_outgoing_receipts_root =
-            Block::compute_chunk_prev_outgoing_receipts_root(&chunk_headers);
-        block.mut_header().get_mut().inner_lite.prev_state_root =
-            Block::compute_state_root(&chunk_headers);
-        block.mut_header().get_mut().inner_rest.chunk_mask = vec![true];
+        block
+            .mut_header()
+            .set_chunk_headers_root(Block::compute_chunk_headers_root(&chunk_headers).0);
+        block.mut_header().set_chunk_tx_root(Block::compute_chunk_tx_root(&chunk_headers));
+        block.mut_header().set_prev_chunk_outgoing_receipts_root(
+            Block::compute_chunk_prev_outgoing_receipts_root(&chunk_headers),
+        );
+        block.mut_header().set_prev_state_root(Block::compute_state_root(&chunk_headers));
+        block.mut_header().set_chunk_mask(vec![true]);
         block.mut_header().resign(&validator_signer);
         env.clients[0].process_block_test(block.clone().into(), Provenance::NONE).unwrap();
     }
@@ -3216,15 +3216,15 @@ fn test_fork_execution_outcome() {
         *chunk_header.height_included_mut() = block.header().height();
         let chunk_headers = vec![chunk_header];
         block.set_chunks(chunk_headers.clone());
-        block.mut_header().get_mut().inner_rest.chunk_headers_root =
-            Block::compute_chunk_headers_root(&chunk_headers).0;
-        block.mut_header().get_mut().inner_rest.chunk_tx_root =
-            Block::compute_chunk_tx_root(&chunk_headers);
-        block.mut_header().get_mut().inner_rest.prev_chunk_outgoing_receipts_root =
-            Block::compute_chunk_prev_outgoing_receipts_root(&chunk_headers);
-        block.mut_header().get_mut().inner_lite.prev_state_root =
-            Block::compute_state_root(&chunk_headers);
-        block.mut_header().get_mut().inner_rest.chunk_mask = vec![true];
+        block
+            .mut_header()
+            .set_chunk_headers_root(Block::compute_chunk_headers_root(&chunk_headers).0);
+        block.mut_header().set_chunk_tx_root(Block::compute_chunk_tx_root(&chunk_headers));
+        block.mut_header().set_prev_chunk_outgoing_receipts_root(
+            Block::compute_chunk_prev_outgoing_receipts_root(&chunk_headers),
+        );
+        block.mut_header().set_prev_state_root(Block::compute_state_root(&chunk_headers));
+        block.mut_header().set_chunk_mask(vec![true]);
         block.mut_header().resign(&validator_signer);
         env.clients[0].process_block_test(block.clone().into(), Provenance::NONE).unwrap();
     }
@@ -3354,7 +3354,7 @@ fn test_node_shutdown_with_old_protocol_version() {
     let validator_signer = create_test_signer("test0");
     for i in 1..=5 {
         let mut block = env.clients[0].produce_block(i).unwrap().unwrap();
-        block.mut_header().get_mut().inner_rest.latest_protocol_version = PROTOCOL_VERSION + 1;
+        block.mut_header().set_latest_protocol_version(PROTOCOL_VERSION + 1);
         block.mut_header().resign(&validator_signer);
         env.process_block(0, block, Provenance::NONE);
     }

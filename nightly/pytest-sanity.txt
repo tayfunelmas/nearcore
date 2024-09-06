@@ -112,6 +112,8 @@ pytest --timeout=240 sanity/switch_node_key.py
 pytest --timeout=240 sanity/switch_node_key.py --features nightly
 pytest --timeout=120 sanity/validator_switch_key_quick.py
 pytest --timeout=120 sanity/validator_switch_key_quick.py --features nightly
+pytest --timeout=120 sanity/validator_remove_key_quick.py
+pytest --timeout=120 sanity/validator_remove_key_quick.py --features nightly
 pytest --timeout=60 sanity/shadow_tracking.py
 pytest --timeout=60 sanity/shadow_tracking.py --features nightly
 pytest sanity/proxy_simple.py
@@ -186,8 +188,7 @@ pytest sanity/slow_chunk.py --features nightly
 pytest sanity/large_witness.py --features nightly
 
 # Tests for congestion control
-# TODO(congestion_control) - enable pytest on stabilization
-# pytest sanity/congestion_control.py
+pytest sanity/congestion_control.py
 pytest sanity/congestion_control.py --features nightly
 pytest sanity/congestion_control_genesis_bootstrap.py
 pytest sanity/congestion_control_genesis_bootstrap.py --features nightly

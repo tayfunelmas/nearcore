@@ -414,9 +414,12 @@ pub enum SyncStatusView {
     /// Not syncing / Done syncing.
     NoSync,
     /// Syncing using light-client headers to a recent epoch
-    // TODO #3488
-    // Bowen: why do we use epoch ordinal instead of epoch id?
-    EpochSync { epoch_ord: u64 },
+    EpochSync {
+        source_peer_height: BlockHeight,
+        source_peer_id: String,
+        attempt_time: String,
+    },
+    EpochSyncDone,
     /// Downloading block headers for fast sync.
     HeaderSync {
         start_height: BlockHeight,
@@ -986,12 +989,7 @@ pub struct BlockHeaderInnerLiteView {
 
 impl From<BlockHeader> for BlockHeaderInnerLiteView {
     fn from(header: BlockHeader) -> Self {
-        let inner_lite = match &header {
-            BlockHeader::BlockHeaderV1(header) => &header.inner_lite,
-            BlockHeader::BlockHeaderV2(header) => &header.inner_lite,
-            BlockHeader::BlockHeaderV3(header) => &header.inner_lite,
-            BlockHeader::BlockHeaderV4(header) => &header.inner_lite,
-        };
+        let inner_lite = header.inner_lite();
         BlockHeaderInnerLiteView {
             height: inner_lite.height,
             epoch_id: inner_lite.epoch_id.0,
@@ -2317,7 +2315,7 @@ pub enum StateChangeCauseView {
     UpdatedDelayedReceipts,
     ValidatorAccountsUpdate,
     Migration,
-    Resharding,
+    ReshardingV2,
 }
 
 impl From<StateChangeCause> for StateChangeCauseView {
@@ -2343,7 +2341,7 @@ impl From<StateChangeCause> for StateChangeCauseView {
             StateChangeCause::UpdatedDelayedReceipts => Self::UpdatedDelayedReceipts,
             StateChangeCause::ValidatorAccountsUpdate => Self::ValidatorAccountsUpdate,
             StateChangeCause::Migration => Self::Migration,
-            StateChangeCause::Resharding => Self::Resharding,
+            StateChangeCause::ReshardingV2 => Self::ReshardingV2,
         }
     }
 }
