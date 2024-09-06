@@ -80,8 +80,7 @@ pub(crate) fn replay_headers(
 
                 assert_eq!(original_validators.epoch_height, replayed_validators.epoch_height);
                 println!(
-                    "\n-----------------------------------------------------------\n" +
-                    "Comparing validator infos for epoch height {} block height {}\n",
+                    "\n-----------------------------------------------------------\nComparing validator infos for epoch height {} block height {}\n",
                     original_validators.epoch_height,
                     height
                 );
