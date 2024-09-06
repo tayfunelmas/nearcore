@@ -190,7 +190,7 @@ fn apply_state_changes(
                 shard_uid,
                 trie_update,
                 state_changes,
-                *block_hash,
+                *block_hash, 
                 block_height,
             );
             let mut store_update = chain_store.store_update();

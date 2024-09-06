@@ -226,7 +226,7 @@ fn get_block_info(
         if ProtocolFeature::StatelessValidation.enabled(protocol_version)
             && header.chunk_endorsements().is_none()
         {
-            let block = chain_store.get_block(header.hash())?;
+            let block = chain_store.get_block(header.hash()).expect("Failed to get block for endorsements")?;
             let chunks = block.chunks();
 
             let endorsement_signatures = block.chunk_endorsements().to_vec();
