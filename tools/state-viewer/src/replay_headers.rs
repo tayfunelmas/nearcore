@@ -79,8 +79,8 @@ pub(crate) fn replay_headers(
                     epoch_manager_replay.get_validator_info(identifier).unwrap();
 
                 assert_eq!(original_validators.epoch_height, replayed_validators.epoch_height);
-                tracing::info!(
-                    "Comparing validator infos for epoch height {} block height {}",
+                println!(
+                    "\nComparing validator infos for epoch height {} block height {}\n",
                     original_validators.epoch_height,
                     height
                 );
@@ -111,7 +111,7 @@ fn compare_validator_production_stats(left: &EpochValidatorInfo, right: &EpochVa
         let left_summary = left_summaries.get(account_id);
         let right_summary = right_summaries.get(account_id);
         if left_summary.is_some() ^ right_summary.is_some() {
-            println!("{}: {:?} --> {:?}", account_id.as_str(), left_summary, right_summary);
+            println!("{}: Validator summary {:?} --> {:?}", account_id.as_str(), left_summary, right_summary);
             continue;
         }
         let left_summary = left_summary.unwrap();
@@ -127,7 +127,7 @@ fn compare_validator_production_stats(left: &EpochValidatorInfo, right: &EpochVa
         }
         if left_summary.block_production_rate != right_summary.block_production_rate {
             println!(
-                "{}: Blocks [diff=%{}] %{} --> %{}",
+                "{}: Block production ratio [diff=%{}] %{} --> %{}",
                 account_id.as_str(),
                 right_summary.block_production_rate - left_summary.block_production_rate,
                 left_summary.block_production_rate,
@@ -136,7 +136,7 @@ fn compare_validator_production_stats(left: &EpochValidatorInfo, right: &EpochVa
         }
         if left_summary.chunk_production_rate != right_summary.chunk_production_rate {
             println!(
-                "{}: Chunks [diff=%{}] %{} --> %{}",
+                "{}: Chunk production ratio [diff=%{}] %{} --> %{}",
                 account_id.as_str(),
                 right_summary.chunk_production_rate - left_summary.chunk_production_rate,
                 left_summary.chunk_production_rate,
@@ -145,7 +145,7 @@ fn compare_validator_production_stats(left: &EpochValidatorInfo, right: &EpochVa
         }
         if left_summary.chunk_endorsement_rate != right_summary.chunk_endorsement_rate {
             println!(
-                "{}: Endorsements [diff=%{}] %{} --> %{}",
+                "{}: Chunk endorsement ratio [diff=%{}] %{} --> %{}",
                 account_id.as_str(),
                 right_summary.chunk_endorsement_rate - left_summary.chunk_endorsement_rate,
                 left_summary.chunk_endorsement_rate,
@@ -164,7 +164,7 @@ fn compare_validator_kickout_stats(left: &EpochValidatorInfo, right: &EpochValid
         let left_kickout = left_kickouts.get(account_id);
         let right_kickout = right_kickouts.get(account_id);
         if left_kickout.is_some() ^ right_kickout.is_some() {
-            println!("{}: {:?} --> {:?}", account_id.as_str(), left_kickout, right_kickout);
+            println!("{}: Kickout {:?} --> {:?}", account_id.as_str(), left_kickout, right_kickout);
             continue;
         }
         let left_kickout = left_kickout.unwrap();
