@@ -541,6 +541,7 @@ fn common_rocksdb_options() -> Options {
 
 fn rocksdb_options(store_config: &StoreConfig, mode: Mode) -> Options {
     let mut opts = common_rocksdb_options();
+    opts.set_log_level(rocksdb::LogLevel::Debug);
     opts.create_missing_column_families(mode.read_write());
     opts.create_if_missing(mode.can_create());
     opts.set_max_open_files(store_config.max_open_files.try_into().unwrap_or(i32::MAX));
