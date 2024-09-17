@@ -13,7 +13,8 @@ use near_chain::stateless_validation::chunk_validation::apply_result_to_chunk_ex
 use near_chain::types::StorageDataSource;
 use near_chain::update_shard::{process_shard_update, ShardUpdateReason, ShardUpdateResult};
 use near_chain::validate::{
-    validate_chunk_proofs, validate_chunk_with_chunk_extra, validate_transactions_order,
+    validate_chunk_proofs, validate_chunk_with_chunk_extra,
+    validate_chunk_with_chunk_extra_and_receipts_root, validate_transactions_order,
 };
 use near_chain::{Block, BlockHeader, Chain, ChainGenesis, ChainStore, ChainStoreAccess};
 use near_chain_configs::GenesisValidationMode;
@@ -25,7 +26,7 @@ use near_primitives::hash::CryptoHash;
 use near_primitives::receipt::Receipt;
 use near_primitives::sharding::{ReceiptProof, ShardChunk, ShardChunkHeader, ShardProof};
 use near_primitives::types::chunk_extra::ChunkExtra;
-use near_primitives::types::{BlockHeight, Gas, ProtocolVersion, ShardId};
+use near_primitives::types::{BlockHeight, EpochId, Gas, ProtocolVersion, ShardId};
 use near_primitives::version::ProtocolFeature;
 use near_state_viewer::progress_reporter::{timestamp_ms, ProgressReporter};
 use near_store::{get_genesis_state_roots, ShardUId, Store};
@@ -88,7 +89,7 @@ enum ReplayBlockOutput {
 /// Result of replaying a chunk.
 struct ReplayChunkOutput {
     chunk_extra: ChunkExtra,
-    outgoing_receipts: Vec<Receipt>,
+    outgoing_receipts: Option<Vec<Receipt>>,
 }
 
 struct ReplayController {
@@ -101,6 +102,7 @@ struct ReplayController {
     start_height: BlockHeight,
     next_height: BlockHeight,
     end_height: BlockHeight,
+    last_new_chunk_height: Vec<Option<BlockHeight>>,
 }
 
 impl ReplayController {
@@ -137,6 +139,9 @@ impl ReplayController {
             tgas_burned: AtomicU64::new(0),
         };
 
+        let shard_layout = epoch_manager.get_shard_layout(&EpochId::default())?;
+        let last_new_chunk_height = shard_layout.shard_ids().map(|id| None).collect::<Vec<_>>();
+
         Ok(Self {
             near_config,
             storage,
@@ -147,6 +152,7 @@ impl ReplayController {
             start_height,
             next_height: start_height,
             end_height,
+            last_new_chunk_height,
         })
     }
 
@@ -159,10 +165,10 @@ impl ReplayController {
             .chain_store
             .get_block(&block_hash)
             .context("Failed to get block for start height")?;
-        if block.header().is_genesis() {
-            // Generate and save chunk extras for the genesis block so that we use them in the next block.
-            self.save_genesis_chunk_extras(&block)?;
-        }
+        // if block.header().is_genesis() {
+        //     // Generate and save chunk extras for the genesis block so that we use them in the next block.
+        //     self.save_genesis_chunk_extras(&block)?;
+        // }
         Ok(())
     }
 
@@ -208,7 +214,7 @@ impl ReplayController {
 
         self.validate_block(&block, protocol_version)?;
 
-        self.update_epoch_manager(&block)?;
+        // self.update_epoch_manager(&block)?;
         if !block.header().is_genesis() {
             self.update_incoming_receipts(&block)?;
         }
@@ -252,12 +258,10 @@ impl ReplayController {
 
             // Save chunk extra and outgoing receipts for future reads.
             let mut store_update = self.chain_store.store_update();
-            store_update.save_chunk_extra(&block_hash, &shard_uid, replay_output.chunk_extra);
-            store_update.save_outgoing_receipt(
-                &block_hash,
-                shard_id,
-                replay_output.outgoing_receipts,
-            );
+            // store_update.save_chunk_extra(&block_hash, &shard_uid, replay_output.chunk_extra);
+            if let Some(outgoing_receipts) = replay_output.outgoing_receipts {
+                store_update.save_outgoing_receipt(&block_hash, shard_id, outgoing_receipts);
+            }
             let _ = store_update.commit()?;
         }
 
@@ -356,7 +360,7 @@ impl ReplayController {
                 shard_uid: _,
                 apply_result,
             }) => {
-                let outgoing_receipts = apply_result.outgoing_receipts.clone();
+                let outgoing_receipts = Some(apply_result.outgoing_receipts.clone());
                 let chunk_extra =
                     apply_result_to_chunk_extra(protocol_version, apply_result, &chunk_header);
                 ReplayChunkOutput { chunk_extra, outgoing_receipts }
@@ -364,10 +368,14 @@ impl ReplayController {
             ShardUpdateResult::OldChunk(OldChunkResult { shard_uid: _, apply_result }) => {
                 let mut chunk_extra = ChunkExtra::clone(&prev_chunk_extra.as_ref());
                 *chunk_extra.state_root_mut() = apply_result.new_root;
-                let outgoing_receipts = apply_result.outgoing_receipts;
-                ReplayChunkOutput { chunk_extra, outgoing_receipts }
+                assert_eq!(apply_result.outgoing_receipts.len(), 0);
+                ReplayChunkOutput { chunk_extra, outgoing_receipts: None }
             }
         };
+
+        if is_new_chunk {
+            self.last_new_chunk_height[shard_id as usize] = Some(height);
+        }
 
         Ok(output)
     }
@@ -412,15 +420,24 @@ impl ReplayController {
     ) -> Result<()> {
         // Check if the information in the ChunkExtra recorded after applying the previuous chunk matches the information in the new chunk.
         if is_new_chunk {
-            validate_chunk_with_chunk_extra(
-                &self.chain_store,
-                self.epoch_manager.as_ref(),
-                prev_block_hash,
-                prev_chunk_extra,
-                prev_chunk_header.height_included(),
-                chunk_header,
-            )
-            .context("Failed to validate chunk with chunk extra")?;
+            if self.last_new_chunk_height[chunk_header.shard_id() as usize].is_none() {
+                validate_chunk_with_chunk_extra_and_receipts_root(
+                    &prev_chunk_extra,
+                    &chunk_header,
+                    &chunk_header.prev_outgoing_receipts_root(),
+                )
+                .context("Failed to validate chunk with chunk extra")?;
+            } else {
+                validate_chunk_with_chunk_extra(
+                    &self.chain_store,
+                    self.epoch_manager.as_ref(),
+                    prev_block_hash,
+                    prev_chunk_extra,
+                    prev_chunk_header.height_included(),
+                    chunk_header,
+                )
+                .context("Failed to validate chunk with chunk extra")?;
+            }
         }
         if !validate_chunk_proofs(&chunk, self.epoch_manager.as_ref())
             .context("Failed to validate the chunk proofs")?

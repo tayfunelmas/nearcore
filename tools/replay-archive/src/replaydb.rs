@@ -143,6 +143,11 @@ pub(crate) fn open_storage_for_replay(
         DBCol::BlockHeader,
         DBCol::State,
         DBCol::Block,
+        // The following columns can be derived when replaying from the genesis,
+        // but they are needed when replaying from an arbitrary block in history.
+        DBCol::EpochInfo,
+        DBCol::BlockInfo,
+        DBCol::ChunkExtra,
     ]);
 
     let opener = NodeStorage::opener(
