@@ -15,7 +15,7 @@ pub(crate) fn open_rocksdb(
         &home.join(nearcore::config::CONFIG_FILENAME),
     )?;
     let store_config = &config.store;
-    let db_path = home_dir.join(store_config.path.as_ref().cloned().unwrap_or_else(|| home.join("data")));
+    let db_path = home.join(store_config.path.as_ref().cloned().unwrap_or_else(|| home.join("data")));
     let rocksdb =
         near_store::db::RocksDB::open(&db_path, store_config, mode, near_store::Temperature::Hot)?;
     Ok(rocksdb)
@@ -33,7 +33,7 @@ pub(crate) fn open_rocksdb_cold(
     let store_config = config.cold_store.as_ref().ok_or_else(|| {
         anyhow!("Cold store is not configured, please configure it in the config file")
     })?;
-    let db_path = home_dir.join(store_config.path.as_ref().cloned().unwrap_or_else(|| home.join("cold-data")));
+    let db_path = home.join(store_config.path.as_ref().cloned().unwrap_or_else(|| home.join("cold-data")));
     let rocksdb =
         near_store::db::RocksDB::open(&db_path, store_config, mode, near_store::Temperature::Cold)?;
     Ok(rocksdb)
