@@ -1,6 +1,6 @@
 use crate::utils::{open_rocksdb, open_rocksdb_cold, resolve_column};
 use clap::Parser;
-use near_store::{db::Database, Mode, Temperature};
+use near_store::{db::Database, Mode, NodeStorage, Temperature};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -16,15 +16,21 @@ pub(crate) struct RunCompactionCommand {
 
 impl RunCompactionCommand {
     pub(crate) fn run(&self, home: &PathBuf) -> anyhow::Result<()> {
-        let db = match self.store_temperature {
-            Temperature::Hot => open_rocksdb(home, Mode::ReadWrite)?,
-            Temperature::Cold => open_rocksdb_cold(home, Mode::ReadWrite)?,
+        let config = nearcore::config::Config::from_file_skip_validation(
+            &home.join(nearcore::config::CONFIG_FILENAME),
+        )?;
+
+        let storage = NodeStorage::opener(home, config.archive, &config.store, config.cold_store.as_ref()).open_in_mode(Mode::ReadWrite)?;
+        let store = match self.store_temperature {
+            Temperature::Hot => storage.get_hot_store(),
+            Temperature::Cold => storage.get_cold_store().ok_or_else(|| anyhow::anyhow!("No cold store"))?,
         };
-        if let Some(col_name) = &self.column {
-            db.compact_column(resolve_column(col_name)?)?;
-        } else {
-            db.compact()?;
-        }
+        // if let Some(col_name) = &self.column {
+        //     db.compact_column(resolve_column(col_name)?)?;
+        // } else {
+        //     db.compact()?;
+        // }
+        store.compact()?;
         eprintln!("Compaction is finished!");
         Ok(())
     }
