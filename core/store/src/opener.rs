@@ -431,7 +431,7 @@ impl<'a> StoreOpener<'a> {
             });
         }
 
-        let snapshot = opener.snapshot()?;
+        // let snapshot = opener.snapshot()?;
 
         for version in version..DB_VERSION {
             tracing::info!(target: "db_opener", path=%opener.path.display(),
@@ -463,7 +463,7 @@ impl<'a> StoreOpener<'a> {
             store.set_db_version(version)?;
         }
 
-        Ok(snapshot)
+        Ok(Snapshot::none())
     }
 
     fn open_store(
