@@ -380,6 +380,10 @@ pub fn migrate_40_to_41(
     let _span = tracing::info_span!(target: "migrations",
         "Migration from 40 to 41: Deleting contents of PartialChunks column Cold DB of archival node")
     .entered();
-    db.drop_column(DBCol::PartialChunks)?;
+    tracing::info!("Dropping column PartialChunks");
+    db.drop_column(DBCol::PartialChunks)?;tracing::info!("Dropping column PartialChunks");
+    tracing::info!("Creating column PartialChunks");
+    db.create_column(DBCol::PartialChunks)?;
+    tracing::info!("Done migrating PartialChunks");
     Ok(())
 }
