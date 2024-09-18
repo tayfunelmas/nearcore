@@ -364,7 +364,11 @@ pub fn migrate_39_to_40(store: &Store) -> anyhow::Result<()> {
 ///
 /// This involves deleting contents of PartialChunks column from the Cold DB of an archival node.
 /// This migration applies ONLY to the Cold DB.
-pub fn migrate_40_to_41(db: &mut dyn Database, kind: DbKind, is_node_archival: bool) -> anyhow::Result<()> {
+pub fn migrate_40_to_41(
+    db: &mut dyn Database,
+    kind: DbKind,
+    is_node_archival: bool,
+) -> anyhow::Result<()> {
     if !is_node_archival {
         tracing::info!(target: "migrations", "No-op migration from 40 to 41 for non-archival node");
         return Ok(());

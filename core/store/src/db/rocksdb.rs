@@ -405,7 +405,16 @@ impl Database for RocksDB {
     fn drop_column(&mut self, col: DBCol) -> io::Result<()> {
         self.db
             .drop_cf(col_name(col))
-            .with_context(|| format!("failed to drop column family {:?}", col)).map_err(io::Error::other)
+            .with_context(|| format!("failed to drop column family {:?}", col))
+            .map_err(io::Error::other)
+    }
+
+    fn create_column(&mut self, col: DBCol) -> io::Result<()> {
+        let opts = common_rocksdb_options();
+        self.db
+            .create_cf(col_name(col), &opts)
+            .with_context(|| format!("failed to create column family {:?}", col))
+            .map_err(io::Error::other)
     }
 
     #[tracing::instrument(

@@ -61,7 +61,7 @@ impl<'a> Migrator<'a> {
     }
 }
 
-impl<'a> near_store::StoreMigrator for Migrator<'a> {
+impl<'a> near_store::DatabaseMigrator for Migrator<'a> {
     fn check_support(&self, version: DbVersion) -> Result<(), &'static str> {
         match version {
             0..=26 => Err("1.26"),
@@ -72,27 +72,27 @@ impl<'a> near_store::StoreMigrator for Migrator<'a> {
 
     fn migrate(
         &self,
-        store: &Store,
         db: &mut dyn Database,
         version: DbVersion,
         kind: Option<DbKind>,
     ) -> anyhow::Result<()> {
         match version {
-            0..=31 => unreachable!(),
-            32 => near_store::migrations::migrate_32_to_33(store),
-            33 => {
-                near_store::migrations::migrate_33_to_34(store, self.config.client_config.archive)
-            }
-            34 => near_store::migrations::migrate_34_to_35(store),
-            35 => {
-                tracing::info!(target: "migrations", "Migrating DB version from 35 to 36. Flat storage data will be created on disk.");
-                tracing::info!(target: "migrations", "It will happen in parallel with regular block processing. ETA is 15h for RPC node and 2d for archival node.");
-                Ok(())
-            }
-            36 => near_store::migrations::migrate_36_to_37(store),
-            37 => near_store::migrations::migrate_37_to_38(store),
-            38 => near_store::migrations::migrate_38_to_39(store),
-            39 => near_store::migrations::migrate_39_to_40(store),
+            0..=39 => unreachable!(),
+            // 0..=31 => unreachable!(),
+            // 32 => near_store::migrations::migrate_32_to_33(store),
+            // 33 => {
+            //     near_store::migrations::migrate_33_to_34(store, self.config.client_config.archive)
+            // }
+            // 34 => near_store::migrations::migrate_34_to_35(store),
+            // 35 => {
+            //     tracing::info!(target: "migrations", "Migrating DB version from 35 to 36. Flat storage data will be created on disk.");
+            //     tracing::info!(target: "migrations", "It will happen in parallel with regular block processing. ETA is 15h for RPC node and 2d for archival node.");
+            //     Ok(())
+            // }
+            // 36 => near_store::migrations::migrate_36_to_37(store),
+            // 37 => near_store::migrations::migrate_37_to_38(store),
+            // 38 => near_store::migrations::migrate_38_to_39(store),
+            // 39 => near_store::migrations::migrate_39_to_40(store),
             40 => near_store::migrations::migrate_40_to_41(
                 db,
                 kind.unwrap_or_else(|| panic!("DB kind is not set for DB at version: {}", version)),

@@ -174,7 +174,7 @@ pub struct StoreOpener<'a> {
 
     /// A migrator which performs database migration if the database has old
     /// version.
-    migrator: Option<&'a dyn StoreMigrator>,
+    migrator: Option<&'a dyn DatabaseMigrator>,
 }
 
 /// Opener for a single RocksDB instance.
@@ -212,12 +212,12 @@ impl<'a> StoreOpener<'a> {
         }
     }
 
-    /// Configures the opener with specified [`StoreMigrator`].
+    /// Configures the opener with specified [`DatabaseMigrator`].
     ///
     /// If the migrator is not configured, the opener will fail to open
     /// databases with older versions.  With migrator configured, it will
     /// attempt to perform migrations.
-    pub fn with_migrator(mut self, migrator: &'a dyn StoreMigrator) -> Self {
+    pub fn with_migrator(mut self, migrator: &'a dyn DatabaseMigrator) -> Self {
         self.migrator = Some(migrator);
         self
     }
@@ -395,7 +395,7 @@ impl<'a> StoreOpener<'a> {
     fn ensure_version(
         mode: Mode,
         opener: &DBOpener,
-        migrator: &Option<&dyn StoreMigrator>,
+        migrator: &Option<&dyn DatabaseMigrator>,
     ) -> Result<Snapshot, StoreOpenerError> {
         tracing::debug!(target: "db_opener", path=%opener.path.display(), "Ensure db version");
 
@@ -443,9 +443,13 @@ impl<'a> StoreOpener<'a> {
             // old migrations on the cold storage. In the future however it may
             // be better to wrap it in the ColdDB object instead.
 
-            let (store, mut db) = Self::open_store(mode, opener, version)?;
-            migrator.migrate(&store, &mut *Arc::get_mut(&mut db).unwrap(), version, kind).map_err(StoreOpenerError::MigrationError)?;
-            // UNCOMMENT BEFORE MERGE: store.set_db_version(version + 1)?;
+            let (rocksdb, _) = opener.open(mode, version)?;
+            let mut rocksdb = Arc::new(rocksdb);
+            migrator
+                .migrate(&mut *Arc::get_mut(&mut rocksdb).unwrap(), version, kind)
+                .map_err(StoreOpenerError::MigrationError)?;
+            let store = Store::new(rocksdb);
+            store.set_db_version(version)?; // TODOOO
         }
 
         if cfg!(feature = "nightly") || cfg!(feature = "nightly_protocol") {
@@ -455,7 +459,7 @@ impl<'a> StoreOpener<'a> {
 
             // Set some dummy value to avoid conflict with other migrations from
             // nightly features.
-            let (store, _) = Self::open_store(mode, opener, DB_VERSION)?;
+            let store = Self::open_store(mode, opener, DB_VERSION)?;
             store.set_db_version(version)?;
         }
 
@@ -466,11 +470,10 @@ impl<'a> StoreOpener<'a> {
         mode: Mode,
         opener: &DBOpener,
         version: DbVersion,
-    ) -> Result<(Store, Arc<dyn Database>), StoreOpenerError> {
-        let (rocksdb, _) = opener.open(mode, version)?;
-        let db = Arc::new(rocksdb);
-        let store = Store { storage: db.clone() };
-        Ok((store, db))
+    ) -> Result<Store, StoreOpenerError> {
+        let (db, _) = opener.open(mode, version)?;
+        let store = Store { storage: Arc::new(db) };
+        Ok(store)
     }
 
     fn open_store_unsafe(mode: Mode, opener: &DBOpener) -> Result<Store, StoreOpenerError> {
@@ -551,7 +554,7 @@ impl<'a> DBOpener<'a> {
     }
 }
 
-pub trait StoreMigrator {
+pub trait DatabaseMigrator {
     /// Checks whether migrator supports database versions starting at given.
     ///
     /// If the `version` is too old and the migrator no longer supports it,
@@ -574,7 +577,6 @@ pub trait StoreMigrator {
     /// equal to [`DB_VERSION`].
     fn migrate(
         &self,
-        store: &Store,
         db: &mut dyn Database,
         version: DbVersion,
         kind: Option<DbKind>,
