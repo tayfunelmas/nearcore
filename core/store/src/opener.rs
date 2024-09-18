@@ -1,5 +1,6 @@
 use crate::db::rocksdb::snapshot::{Snapshot, SnapshotError, SnapshotRemoveError};
 use crate::db::rocksdb::RocksDB;
+use crate::db::Database;
 use crate::metadata::{DbKind, DbMetadata, DbVersion, DB_VERSION};
 use crate::{DBCol, DBTransaction, Mode, NodeStorage, Store, StoreConfig, Temperature};
 use std::sync::Arc;
@@ -442,9 +443,9 @@ impl<'a> StoreOpener<'a> {
             // old migrations on the cold storage. In the future however it may
             // be better to wrap it in the ColdDB object instead.
 
-            let store = Self::open_store(mode, opener, version)?;
-            migrator.migrate(&store, version, kind).map_err(StoreOpenerError::MigrationError)?;
-            store.set_db_version(version + 1)?;
+            let (store, mut db) = Self::open_store(mode, opener, version)?;
+            migrator.migrate(&store, &mut *Arc::get_mut(&mut db).unwrap(), version, kind).map_err(StoreOpenerError::MigrationError)?;
+            // UNCOMMENT BEFORE MERGE: store.set_db_version(version + 1)?;
         }
 
         if cfg!(feature = "nightly") || cfg!(feature = "nightly_protocol") {
@@ -454,7 +455,7 @@ impl<'a> StoreOpener<'a> {
 
             // Set some dummy value to avoid conflict with other migrations from
             // nightly features.
-            let store = Self::open_store(mode, opener, DB_VERSION)?;
+            let (store, _) = Self::open_store(mode, opener, DB_VERSION)?;
             store.set_db_version(version)?;
         }
 
@@ -465,10 +466,11 @@ impl<'a> StoreOpener<'a> {
         mode: Mode,
         opener: &DBOpener,
         version: DbVersion,
-    ) -> Result<Store, StoreOpenerError> {
-        let (db, _) = opener.open(mode, version)?;
-        let store = Store { storage: Arc::new(db) };
-        Ok(store)
+    ) -> Result<(Store, Arc<dyn Database>), StoreOpenerError> {
+        let (rocksdb, _) = opener.open(mode, version)?;
+        let db = Arc::new(rocksdb);
+        let store = Store { storage: db.clone() };
+        Ok((store, db))
     }
 
     fn open_store_unsafe(mode: Mode, opener: &DBOpener) -> Result<Store, StoreOpenerError> {
@@ -573,6 +575,7 @@ pub trait StoreMigrator {
     fn migrate(
         &self,
         store: &Store,
+        db: &mut dyn Database,
         version: DbVersion,
         kind: Option<DbKind>,
     ) -> anyhow::Result<()>;

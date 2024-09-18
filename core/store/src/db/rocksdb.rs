@@ -402,6 +402,12 @@ impl Database for RocksDB {
         self.db.write(batch).map_err(io::Error::other)
     }
 
+    fn drop_column(&mut self, col: DBCol) -> io::Result<()> {
+        self.db
+            .drop_cf(col_name(col))
+            .with_context(|| format!("failed to drop column family {:?}", col)).map_err(io::Error::other)
+    }
+
     #[tracing::instrument(
         target = "store::db::rocksdb",
         level = "info",

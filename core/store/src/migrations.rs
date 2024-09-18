@@ -1,3 +1,4 @@
+use crate::db::Database;
 use crate::metadata::DbKind;
 use crate::{DBCol, Store, StoreUpdate};
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -363,7 +364,7 @@ pub fn migrate_39_to_40(store: &Store) -> anyhow::Result<()> {
 ///
 /// This involves deleting contents of PartialChunks column from the Cold DB of an archival node.
 /// This migration applies ONLY to the Cold DB.
-pub fn migrate_40_to_41(store: &Store, kind: DbKind, is_node_archival: bool) -> anyhow::Result<()> {
+pub fn migrate_40_to_41(db: &mut dyn Database, kind: DbKind, is_node_archival: bool) -> anyhow::Result<()> {
     if !is_node_archival {
         tracing::info!(target: "migrations", "No-op migration from 40 to 41 for non-archival node");
         return Ok(());
@@ -375,8 +376,6 @@ pub fn migrate_40_to_41(store: &Store, kind: DbKind, is_node_archival: bool) -> 
     let _span = tracing::info_span!(target: "migrations",
         "Migration from 40 to 41: Deleting contents of PartialChunks column Cold DB of archival node")
     .entered();
-    let mut update = store.store_update();
-    update.delete_all(DBCol::PartialChunks);
-    update.commit()?;
+    db.drop_column(DBCol::PartialChunks)?;
     Ok(())
 }

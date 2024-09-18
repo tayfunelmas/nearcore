@@ -239,6 +239,14 @@ pub trait Database: Sync + Send {
     /// Atomically apply all operations in given batch at once.
     fn write(&self, batch: DBTransaction) -> io::Result<()>;
 
+    fn drop_column(&mut self, _col: DBCol) -> io::Result<()> {
+        unimplemented!("Dropping columns is not supported");
+    }
+
+    fn create_column(&mut self, _col: DBCol) -> io::Result<()> {
+        unimplemented!("Creating columns is not supported");
+    }
+
     /// Flush all in-memory data to disk.
     ///
     /// This is a no-op for in-memory databases.
