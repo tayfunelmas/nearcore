@@ -431,7 +431,7 @@ impl<'a> StoreOpener<'a> {
             });
         }
 
-        // let snapshot = opener.snapshot()?;
+        let snapshot = opener.snapshot()?;
 
         for version in version..DB_VERSION {
             tracing::info!(target: "db_opener", path=%opener.path.display(),
@@ -449,7 +449,7 @@ impl<'a> StoreOpener<'a> {
                 .migrate(&mut *Arc::get_mut(&mut rocksdb).unwrap(), version, kind)
                 .map_err(StoreOpenerError::MigrationError)?;
             let store = Store::new(rocksdb);
-            store.set_db_version(version)?; // TODOOO
+            store.set_db_version(version + 1)?;
         }
 
         if cfg!(feature = "nightly") || cfg!(feature = "nightly_protocol") {
@@ -463,7 +463,7 @@ impl<'a> StoreOpener<'a> {
             store.set_db_version(version)?;
         }
 
-        Ok(Snapshot::none())
+        Ok(snapshot)
     }
 
     fn open_store(

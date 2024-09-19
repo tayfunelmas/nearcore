@@ -382,8 +382,8 @@ pub fn migrate_40_to_41(
     .entered();
     tracing::info!("Dropping column PartialChunks");
     db.drop_column(DBCol::PartialChunks)?;tracing::info!("Dropping column PartialChunks");
-    tracing::info!("Creating column PartialChunks");
-    db.create_column(DBCol::PartialChunks)?;
-    tracing::info!("Done migrating PartialChunks");
+    // tracing::info!("Creating column PartialChunks");
+    // db.create_column(DBCol::PartialChunks)?;
+    tracing::info!("Done dropping column PartialChunks");
     Ok(())
 }
