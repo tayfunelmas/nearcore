@@ -21,6 +21,7 @@ use near_primitives::hash::CryptoHash;
 use near_primitives::network::{AnnounceAccount, PeerId};
 use near_primitives::sharding::PartialEncodedChunkWithArcReceipts;
 use near_primitives::stateless_validation::chunk_endorsement::ChunkEndorsement;
+use near_primitives::stateless_validation::contract_distribution::ContractChanges;
 use near_primitives::stateless_validation::partial_witness::PartialEncodedStateWitness;
 use near_primitives::stateless_validation::state_witness::ChunkStateWitnessAck;
 use near_primitives::transaction::SignedTransaction;
@@ -291,6 +292,8 @@ pub enum NetworkRequests {
     EpochSyncRequest { peer_id: PeerId },
     /// Response to an epoch sync request
     EpochSyncResponse { route_back: CryptoHash, proof: CompressedEpochSyncProof },
+    /// Message for sending contract changes to validators.
+    ContractChanges(Vec<AccountId>, ContractChanges),
 }
 
 /// Combines peer address info, chain.

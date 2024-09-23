@@ -471,6 +471,29 @@ impl TestEnv {
         }
     }
 
+    pub fn propagate_contract_changes(&mut self, allow_errors: bool) {
+        let network_adapters = self.network_adapters.clone();
+        for network_adapter in network_adapters {
+            network_adapter.handle_filtered(|request| match request {
+                PeerManagerMessageRequest::NetworkRequests(NetworkRequests::ContractChanges(
+                    receivers,
+                    contract_changes,
+                )) => {
+                    for receiver in receivers.into_iter() {
+                        let processing_result = self
+                            .client(&receiver)
+                            .process_contract_changes(contract_changes.clone());
+                        if !allow_errors {
+                            processing_result.unwrap();
+                        }
+                    }
+                    None
+                }
+                _ => Some(request),
+            });
+        }
+    }
+
     pub fn send_money(&mut self, id: usize) -> ProcessTxResponse {
         let account_id = self.get_client_id(0);
         let signer =
@@ -639,6 +662,7 @@ impl TestEnv {
             self.save_trie_changes,
             None,
             self.clients[idx].partial_witness_adapter.clone(),
+            self.clients[idx].contract_distribution_adapter.clone(),
             self.clients[idx].validator_signer.get().unwrap(),
         )
     }

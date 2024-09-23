@@ -1172,6 +1172,16 @@ impl PeerManagerActor {
                     NetworkResponses::RouteNotFound
                 }
             }
+            NetworkRequests::ContractChanges(validator_accounts, contract_changes) => {
+                for validator in validator_accounts {
+                    self.state.send_message_to_account(
+                        &self.clock,
+                        &validator,
+                        RoutedMessageBody::ContractChanges(contract_changes.clone()),
+                    );
+                }
+                NetworkResponses::NoResponse
+            }
         }
     }
 

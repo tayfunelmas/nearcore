@@ -15,7 +15,7 @@ use crate::stateless_validation::partial_witness::partial_witness_actor::Partial
 use crate::sync::adapter::{SyncMessage, SyncShardInfo};
 use crate::sync::state::{StateSync, StateSyncResult};
 use crate::sync_jobs_actor::{ClientSenderForSyncJobs, SyncJobsActor};
-use crate::{metrics, StatusResponse, SyncAdapter};
+use crate::{metrics, ContractDistributionSenderForClient, StatusResponse, SyncAdapter};
 use actix::Actor;
 use near_async::actix::AddrWithAutoSpanContextExt;
 use near_async::actix_wrapper::ActixWrapper;
@@ -140,6 +140,7 @@ pub fn start_client(
     adv: crate::adversarial::Controls,
     config_updater: Option<ConfigUpdater>,
     partial_witness_adapter: PartialWitnessSenderForClient,
+    contract_distribution_adapter: ContractDistributionSenderForClient,
     enable_doomslug: bool,
     seed: Option<RngSeed>,
 ) -> StartClientResult {
@@ -163,6 +164,7 @@ pub fn start_client(
         snapshot_callbacks,
         Arc::new(RayonAsyncComputationSpawner),
         partial_witness_adapter,
+        contract_distribution_adapter,
     )
     .unwrap();
     let resharding_handle = client.chain.resharding_handle.clone();

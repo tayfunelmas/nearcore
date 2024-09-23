@@ -1,3 +1,6 @@
+use crate::ContractDistributionActor;
+
+use super::contract_distribution::SynchronousContractDistributionAdapter;
 use super::mock_partial_witness_adapter::MockPartialWitnessAdapter;
 use super::setup::{setup_client_with_runtime, setup_synchronous_shards_manager};
 use super::test_env::TestEnv;
@@ -10,7 +13,7 @@ use near_chain::state_snapshot_actor::SnapshotCallbacks;
 use near_chain::test_utils::{KeyValueRuntime, MockEpochManager, ValidatorSchedule};
 use near_chain::types::RuntimeAdapter;
 use near_chain::ChainGenesis;
-use near_chain_configs::GenesisConfig;
+use near_chain_configs::{GenesisConfig, MutableConfigValue};
 use near_chunks::test_utils::MockClientAdapterForShardsManager;
 use near_epoch_manager::shard_tracker::{ShardTracker, TrackedConfig};
 use near_epoch_manager::{EpochManager, EpochManagerAdapter, EpochManagerHandle};
@@ -514,6 +517,18 @@ impl TestEnvBuilder {
             .collect_vec();
         let partial_witness_adapters =
             (0..num_clients).map(|_| MockPartialWitnessAdapter::default()).collect_vec();
+        let validator_signers = (0..num_clients)
+            .map(|i| Arc::new(create_test_signer(clients[i].as_str())))
+            .collect_vec();
+        let contract_distribution_adapters = (0..num_clients)
+            .map(|i| {
+                SynchronousContractDistributionAdapter::new(ContractDistributionActor::new(
+                    network_adapters[i].clone().as_multi_sender(),
+                    MutableConfigValue::new(Some(validator_signers[i].clone()), "validator_signer"),
+                    epoch_managers[i].clone().into_adapter(),
+                ))
+            })
+            .collect_vec();
         let shards_manager_adapters = (0..num_clients)
             .map(|i| {
                 let clock = clock.clone();
@@ -539,6 +554,7 @@ impl TestEnvBuilder {
                     let account_id = clients[i].clone();
                     let network_adapter = network_adapters[i].clone();
                     let partial_witness_adapter = partial_witness_adapters[i].clone();
+                    let contract_distribution_adapter = contract_distribution_adapters[i].clone();
                     let shards_manager_adapter = shards_manager_adapters[i].clone();
                     let epoch_manager = epoch_managers[i].clone();
                     let shard_tracker = shard_trackers[i].clone();
@@ -562,7 +578,6 @@ impl TestEnvBuilder {
                         make_snapshot_callback,
                         delete_snapshot_callback,
                     };
-                    let validator_signer = Arc::new(create_test_signer(clients[i].as_str()));
                     setup_client_with_runtime(
                         clock.clone(),
                         u64::try_from(num_validators).unwrap(),
@@ -578,7 +593,8 @@ impl TestEnvBuilder {
                         self.save_trie_changes,
                         Some(snapshot_callbacks),
                         partial_witness_adapter.into_multi_sender(),
-                        validator_signer,
+contract_distribution_adapter.into_multi_sender(),
+                        validator_signers[i].clone(),
                     )
                 })
                 .collect();

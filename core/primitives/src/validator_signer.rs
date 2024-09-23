@@ -12,6 +12,7 @@ use crate::sharding::ChunkHash;
 use crate::stateless_validation::chunk_endorsement::{
     ChunkEndorsementInner, ChunkEndorsementMetadata,
 };
+use crate::stateless_validation::contract_distribution::ContractChangesInner;
 use crate::stateless_validation::partial_witness::PartialEncodedStateWitnessInner;
 use crate::stateless_validation::state_witness::EncodedChunkStateWitness;
 use crate::telemetry::TelemetryInfo;
@@ -118,6 +119,13 @@ impl ValidatorSigner {
         match self {
             ValidatorSigner::Empty(signer) => signer.sign_partial_encoded_state_witness(part),
             ValidatorSigner::InMemory(signer) => signer.sign_partial_encoded_state_witness(part),
+        }
+    }
+
+    pub fn sign_contract_changes(&self, inner: &ContractChangesInner) -> Signature {
+        match self {
+            ValidatorSigner::Empty(signer) => signer.sign_contract_changes(inner),
+            ValidatorSigner::InMemory(signer) => signer.sign_contract_changes(inner),
         }
     }
 
@@ -257,6 +265,10 @@ impl EmptyValidatorSigner {
         Signature::default()
     }
 
+    fn sign_contract_changes(&self, _inner: &ContractChangesInner) -> Signature {
+        Signature::default()
+    }
+
     fn sign_challenge(&self, challenge_body: &ChallengeBody) -> (CryptoHash, Signature) {
         (CryptoHash::hash_borsh(challenge_body), Signature::default())
     }
@@ -356,6 +368,10 @@ impl InMemoryValidatorSigner {
         part: &PartialEncodedStateWitnessInner,
     ) -> Signature {
         self.signer.sign(&borsh::to_vec(part).unwrap())
+    }
+
+    fn sign_contract_changes(&self, inner: &ContractChangesInner) -> Signature {
+        self.signer.sign(&borsh::to_vec(inner).unwrap())
     }
 
     fn sign_challenge(&self, challenge_body: &ChallengeBody) -> (CryptoHash, Signature) {

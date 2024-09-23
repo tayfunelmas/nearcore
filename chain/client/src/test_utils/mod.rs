@@ -1,5 +1,6 @@
 pub mod block_stats;
 pub mod client;
+mod contract_distribution;
 mod mock_partial_witness_adapter;
 pub mod peer_manager_mock;
 pub mod setup;

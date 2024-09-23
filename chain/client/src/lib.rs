@@ -27,6 +27,10 @@ pub use stateless_validation::partial_witness::partial_witness_actor::{
     DistributeStateWitnessRequest, PartialWitnessActor,
 };
 
+pub use stateless_validation::contract_distribution::{
+    ContractDistributionActor, ContractDistributionSenderForClient,
+};
+
 pub mod adapter;
 pub mod adversarial;
 mod chunk_distribution_network;

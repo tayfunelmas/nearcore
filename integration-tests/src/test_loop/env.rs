@@ -6,7 +6,7 @@ use near_async::time::Duration;
 use near_chunks::adapter::ShardsManagerRequestFromClient;
 use near_chunks::shards_manager_actor::ShardsManagerActor;
 use near_client::client_actor::ClientActorInner;
-use near_client::{PartialWitnessActor, ViewClientActorInner};
+use near_client::{ContractDistributionActor, PartialWitnessActor, ViewClientActorInner};
 use near_jsonrpc::ViewClientSenderForRpc;
 use near_network::shards_manager::ShardsManagerRequestFromNetwork;
 use near_network::state_witness::PartialWitnessSenderForNetwork;
@@ -144,6 +144,7 @@ pub struct TestData {
     pub view_client_sender: TestLoopSender<ViewClientActorInner>,
     pub shards_manager_sender: TestLoopSender<ShardsManagerActor>,
     pub partial_witness_sender: TestLoopSender<PartialWitnessActor>,
+    pub contract_distribution_sender: TestLoopSender<ContractDistributionActor>,
     pub state_sync_dumper_handle: TestLoopDataHandle<StateSyncDumper>,
 }
 

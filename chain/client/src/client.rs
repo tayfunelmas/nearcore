@@ -12,9 +12,9 @@ use crate::sync::adapter::SyncShardInfo;
 use crate::sync::block::BlockSync;
 use crate::sync::header::HeaderSync;
 use crate::sync::state::{StateSync, StateSyncResult};
-use crate::SyncAdapter;
 use crate::SyncMessage;
 use crate::{metrics, SyncStatus};
+use crate::{ContractDistributionSenderForClient, SyncAdapter};
 use itertools::Itertools;
 use near_async::futures::{AsyncComputationSpawner, FutureSpawner};
 use near_async::messaging::IntoSender;
@@ -192,6 +192,7 @@ pub struct Client {
     pub partial_witness_adapter: PartialWitnessSenderForClient,
     // Optional value used for the Chunk Distribution Network Feature.
     chunk_distribution_network: Option<ChunkDistributionNetwork>,
+    pub contract_distribution_adapter: ContractDistributionSenderForClient,
 }
 
 impl AsRef<Client> for Client {
@@ -246,6 +247,7 @@ impl Client {
         snapshot_callbacks: Option<SnapshotCallbacks>,
         async_computation_spawner: Arc<dyn AsyncComputationSpawner>,
         partial_witness_adapter: PartialWitnessSenderForClient,
+        contract_distribution_adapter: ContractDistributionSenderForClient,
     ) -> Result<Self, Error> {
         let doomslug_threshold_mode = if enable_doomslug {
             DoomslugThresholdMode::TwoThirds
@@ -404,6 +406,7 @@ impl Client {
             chunk_endorsement_tracker,
             partial_witness_adapter,
             chunk_distribution_network,
+            contract_distribution_adapter,
         })
     }
 

@@ -27,8 +27,8 @@ use near_client::adapter::client_sender_for_network;
 use near_client::gc_actor::GCActor;
 use near_client::sync::adapter::SyncAdapter;
 use near_client::{
-    start_client, ClientActor, ConfigUpdater, PartialWitnessActor, StartClientResult,
-    ViewClientActor, ViewClientActorInner,
+    start_client, ClientActor, ConfigUpdater, ContractDistributionActor, PartialWitnessActor,
+    StartClientResult, ViewClientActor, ViewClientActorInner,
 };
 use near_epoch_manager::shard_tracker::{ShardTracker, TrackedConfig};
 use near_epoch_manager::EpochManager;
@@ -376,6 +376,13 @@ pub fn start_with_config_and_synchronization(
             storage.get_hot_store(),
         ));
 
+    let (contract_distribution_actor, contract_distribution_arbiter) =
+        spawn_actix_actor(ContractDistributionActor::new(
+            network_adapter.as_multi_sender(),
+            config.validator_signer.clone(),
+            epoch_manager.clone(),
+        ));
+
     let (_gc_actor, gc_arbiter) = spawn_actix_actor(GCActor::new(
         runtime.store().clone(),
         chain_genesis.height,
@@ -403,6 +410,7 @@ pub fn start_with_config_and_synchronization(
         adv,
         config_updater,
         partial_witness_actor.clone().with_auto_span_context().into_multi_sender(),
+        contract_distribution_actor.with_auto_span_context().into_multi_sender(),
         true,
         None,
     );
@@ -506,6 +514,7 @@ pub fn start_with_config_and_synchronization(
         state_snapshot_arbiter,
         gc_arbiter,
         partial_witness_arbiter,
+        contract_distribution_arbiter,
     ];
     if let Some(db_metrics_arbiter) = db_metrics_arbiter {
         arbiters.push(db_metrics_arbiter);

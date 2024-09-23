@@ -5,12 +5,14 @@
 use super::block_stats::BlockStats;
 use super::peer_manager_mock::PeerManagerMock;
 use crate::client_actor::ClientActorInner;
+use crate::stateless_validation::contract_distribution::DistributeContractChangesRequest;
 use crate::stateless_validation::partial_witness::partial_witness_actor::{
     PartialWitnessActor, PartialWitnessSenderForClient,
 };
 use crate::{
-    start_client, Client, ClientActor, StartClientResult, SyncAdapter, SyncStatus, ViewClientActor,
-    ViewClientActorInner,
+    start_client, Client, ClientActor, ContractDistributionActor,
+    ContractDistributionSenderForClient, StartClientResult, SyncAdapter, SyncStatus,
+    ViewClientActor, ViewClientActorInner,
 };
 use actix::{Actor, Addr, Context};
 use futures::{future, FutureExt};
@@ -97,6 +99,7 @@ pub fn setup(
     Addr<ViewClientActor>,
     ShardsManagerAdapterForTest,
     PartialWitnessSenderForNetwork,
+    ContractDistributionSenderForClient,
 ) {
     let store = create_test_store();
     let num_validator_seats = vs.all_block_producers().count() as NumSeats;
@@ -166,6 +169,13 @@ pub fn setup(
     ));
     let partial_witness_adapter = partial_witness_addr.with_auto_span_context();
 
+    let (contract_distribution_addr, _) = spawn_actix_actor(ContractDistributionActor::new(
+        network_adapter.clone(),
+        signer.clone(),
+        epoch_manager.clone(),
+    ));
+    let contract_distribution_adapter = contract_distribution_addr.with_auto_span_context();
+
     let shards_manager_adapter_for_client = LateBoundSender::new();
     let StartClientResult { client_actor, .. } = start_client(
         clock,
@@ -185,6 +195,7 @@ pub fn setup(
         adv,
         None,
         partial_witness_adapter.clone().into_multi_sender(),
+        contract_distribution_adapter.clone().into_multi_sender(),
         enable_doomslug,
         Some(TEST_SEED),
     );
@@ -209,6 +220,7 @@ pub fn setup(
         view_client_addr,
         shards_manager_adapter.into_multi_sender(),
         partial_witness_adapter.into_multi_sender(),
+        contract_distribution_adapter.into_multi_sender(),
     )
 }
 
@@ -343,7 +355,13 @@ pub fn setup_mock_with_validity_period(
 ) -> ActorHandlesForTesting {
     let network_adapter = LateBoundSender::new();
     let vs = ValidatorSchedule::new().block_producers_per_epoch(vec![validators]);
-    let (client_addr, view_client_addr, shards_manager_adapter, partial_witness_sender) = setup(
+    let (
+        client_addr,
+        view_client_addr,
+        shards_manager_adapter,
+        partial_witness_sender,
+        contract_distribution_sender,
+    ) = setup(
         clock.clone(),
         vs,
         10,
@@ -372,6 +390,7 @@ pub fn setup_mock_with_validity_period(
         view_client_actor: view_client_addr,
         shards_manager_adapter,
         partial_witness_sender,
+        contract_distribution_sender,
     }
 }
 
@@ -381,6 +400,7 @@ pub struct ActorHandlesForTesting {
     pub view_client_actor: Addr<ViewClientActor>,
     pub shards_manager_adapter: ShardsManagerAdapterForTest,
     pub partial_witness_sender: PartialWitnessSenderForNetwork,
+    pub contract_distribution_sender: ContractDistributionSenderForClient,
 }
 
 fn send_chunks<T, I, F>(
@@ -758,6 +778,19 @@ fn process_peer_manager_message_default(
                 }
             }
         }
+        NetworkRequests::ContractChanges(accounts, contract_changes) => {
+            for account in accounts {
+                for (i, name) in validators.iter().enumerate() {
+                    if name == account {
+                        connectors[i].contract_distribution_sender.send(
+                            DistributeContractChangesRequest {
+                                contract_changes: contract_changes.clone(),
+                            },
+                        );
+                    }
+                }
+            }
+        }
         NetworkRequests::ForwardTx(_, _)
         | NetworkRequests::BanPeer { .. }
         | NetworkRequests::TxStatus(_, _, _)
@@ -901,7 +934,13 @@ pub fn setup_mock_all_validators(
         })
         .start();
 
-        let (client_addr, view_client_addr, shards_manager_adapter, partial_witness_sender) = setup(
+        let (
+            client_addr,
+            view_client_addr,
+            shards_manager_adapter,
+            partial_witness_sender,
+            contract_distribution_sender,
+        ) = setup(
             clock.clone(),
             vs,
             epoch_length,
@@ -925,6 +964,7 @@ pub fn setup_mock_all_validators(
             view_client_actor: view_client_addr,
             shards_manager_adapter,
             partial_witness_sender,
+            contract_distribution_sender,
         });
     }
     hash_to_height.write().unwrap().insert(CryptoHash::default(), 0);
@@ -1002,6 +1042,7 @@ pub fn setup_client_with_runtime(
     save_trie_changes: bool,
     snapshot_callbacks: Option<SnapshotCallbacks>,
     partial_witness_adapter: PartialWitnessSenderForClient,
+    contract_distribution_adapter: ContractDistributionSenderForClient,
     validator_signer: Arc<ValidatorSigner>,
 ) -> Client {
     let mut config =
@@ -1028,6 +1069,7 @@ pub fn setup_client_with_runtime(
         snapshot_callbacks,
         Arc::new(RayonAsyncComputationSpawner),
         partial_witness_adapter,
+        contract_distribution_adapter,
     )
     .unwrap();
     client.sync_status = SyncStatus::NoSync;

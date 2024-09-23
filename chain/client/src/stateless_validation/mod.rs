@@ -1,5 +1,6 @@
 pub mod chunk_endorsement;
 pub mod chunk_validator;
+pub mod contract_distribution;
 pub mod partial_witness;
 mod shadow_validate;
 mod state_witness_producer;

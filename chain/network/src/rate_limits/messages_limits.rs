@@ -170,6 +170,7 @@ pub enum RateLimitedPeerMessageKey {
     ChunkStateWitnessAck,
     PartialEncodedStateWitness,
     PartialEncodedStateWitnessForward,
+    ContractChanges,
 }
 
 /// Given a `PeerMessage` returns a tuple containing the `RateLimitedPeerMessageKey`
@@ -221,6 +222,7 @@ fn get_key_and_token_cost(message: &PeerMessage) -> Option<(RateLimitedPeerMessa
             RoutedMessageBody::EpochSyncRequest => None,
             RoutedMessageBody::EpochSyncResponse(_) => None,
             RoutedMessageBody::StatePartRequest(_) => None, // TODO
+            RoutedMessageBody::ContractChanges(_) => Some((ContractChanges, 1)),
             RoutedMessageBody::Ping(_)
             | RoutedMessageBody::Pong(_)
             | RoutedMessageBody::_UnusedChunkStateWitness

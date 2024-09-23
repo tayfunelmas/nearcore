@@ -22,7 +22,9 @@ use near_client::client_actor::ClientActorInner;
 use near_client::gc_actor::GCActor;
 use near_client::sync_jobs_actor::SyncJobsActor;
 use near_client::test_utils::test_loop::test_loop_sync_actor_maker;
-use near_client::{Client, PartialWitnessActor, SyncAdapter, ViewClientActorInner};
+use near_client::{
+    Client, ContractDistributionActor, PartialWitnessActor, SyncAdapter, ViewClientActorInner,
+};
 use near_epoch_manager::shard_tracker::{ShardTracker, TrackedConfig};
 use near_epoch_manager::{EpochManager, EpochManagerAdapter};
 use near_network::test_loop::{TestLoopNetworkSharedState, TestLoopPeerManagerActor};
@@ -227,6 +229,7 @@ impl TestLoopBuilder {
         let network_adapter = LateBoundSender::new();
         let state_snapshot_adapter = LateBoundSender::new();
         let partial_witness_adapter = LateBoundSender::new();
+        let contract_distribution_adapter = LateBoundSender::new();
         let sync_jobs_adapter = LateBoundSender::new();
 
         let genesis = self.genesis.clone().unwrap();
@@ -363,6 +366,7 @@ impl TestLoopBuilder {
             Some(snapshot_callbacks),
             Arc::new(self.test_loop.async_computation_spawner(|_| Duration::milliseconds(80))),
             partial_witness_adapter.as_multi_sender(),
+            contract_distribution_adapter.as_multi_sender(),
         )
         .unwrap();
 
@@ -442,6 +446,12 @@ impl TestLoopBuilder {
             store,
         );
 
+        let contract_distribution_actor = ContractDistributionActor::new(
+            network_adapter.as_multi_sender(),
+            validator_signer.clone(),
+            epoch_manager.clone(),
+        );
+
         let gc_actor = GCActor::new(
             runtime_adapter.store().clone(),
             chain_genesis.height,
@@ -484,6 +494,11 @@ impl TestLoopBuilder {
             partial_witness_actor,
             Some(partial_witness_adapter),
         );
+        let contract_distribution_sender = self.test_loop.register_actor_for_index(
+            idx,
+            contract_distribution_actor,
+            Some(contract_distribution_adapter),
+        );
         self.test_loop.register_actor_for_index(idx, sync_jobs_actor, Some(sync_jobs_adapter));
         self.test_loop.register_actor_for_index(idx, state_snapshot, Some(state_snapshot_adapter));
 
@@ -503,6 +518,7 @@ impl TestLoopBuilder {
             view_client_sender,
             shards_manager_sender,
             partial_witness_sender,
+            contract_distribution_sender,
             state_sync_dumper_handle,
         };
         (data, network_adapter, epoch_manager)
