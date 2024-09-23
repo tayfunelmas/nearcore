@@ -9,7 +9,7 @@ mod state_sync;
 pub use edge::*;
 use near_primitives::stateless_validation::chunk_endorsement::ChunkEndorsement;
 use near_primitives::stateless_validation::chunk_endorsement::ChunkEndorsementV1;
-use near_primitives::stateless_validation::contract_distribution::ContractChanges;
+use near_primitives::stateless_validation::contract_distribution::SignedEncodedContractChanges;
 use near_primitives::stateless_validation::partial_witness::PartialEncodedStateWitness;
 use near_primitives::stateless_validation::state_witness::ChunkStateWitnessAck;
 pub use peer::*;
@@ -555,7 +555,7 @@ pub enum RoutedMessageBody {
     EpochSyncRequest,
     EpochSyncResponse(CompressedEpochSyncProof),
     StatePartRequest(StatePartRequest),
-    ContractChanges(ContractChanges),
+    ContractChanges(SignedEncodedContractChanges),
 }
 
 impl RoutedMessageBody {

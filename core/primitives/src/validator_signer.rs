@@ -12,7 +12,7 @@ use crate::sharding::ChunkHash;
 use crate::stateless_validation::chunk_endorsement::{
     ChunkEndorsementInner, ChunkEndorsementMetadata,
 };
-use crate::stateless_validation::contract_distribution::ContractChangesInner;
+use crate::stateless_validation::contract_distribution::EncodedContractChangesInner;
 use crate::stateless_validation::partial_witness::PartialEncodedStateWitnessInner;
 use crate::stateless_validation::state_witness::EncodedChunkStateWitness;
 use crate::telemetry::TelemetryInfo;
@@ -122,7 +122,7 @@ impl ValidatorSigner {
         }
     }
 
-    pub fn sign_contract_changes(&self, inner: &ContractChangesInner) -> Signature {
+    pub fn sign_contract_changes(&self, inner: &EncodedContractChangesInner) -> Signature {
         match self {
             ValidatorSigner::Empty(signer) => signer.sign_contract_changes(inner),
             ValidatorSigner::InMemory(signer) => signer.sign_contract_changes(inner),
@@ -265,7 +265,7 @@ impl EmptyValidatorSigner {
         Signature::default()
     }
 
-    fn sign_contract_changes(&self, _inner: &ContractChangesInner) -> Signature {
+    fn sign_contract_changes(&self, _inner: &EncodedContractChangesInner) -> Signature {
         Signature::default()
     }
 
@@ -370,7 +370,7 @@ impl InMemoryValidatorSigner {
         self.signer.sign(&borsh::to_vec(part).unwrap())
     }
 
-    fn sign_contract_changes(&self, inner: &ContractChangesInner) -> Signature {
+    fn sign_contract_changes(&self, inner: &EncodedContractChangesInner) -> Signature {
         self.signer.sign(&borsh::to_vec(inner).unwrap())
     }
 

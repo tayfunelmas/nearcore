@@ -5,7 +5,6 @@
 use super::block_stats::BlockStats;
 use super::peer_manager_mock::PeerManagerMock;
 use crate::client_actor::ClientActorInner;
-use crate::stateless_validation::contract_distribution::DistributeContractChangesRequest;
 use crate::stateless_validation::partial_witness::partial_witness_actor::{
     PartialWitnessActor, PartialWitnessSenderForClient,
 };
@@ -40,6 +39,9 @@ use near_epoch_manager::EpochManagerAdapter;
 use near_network::client::{
     AnnounceAccountRequest, BlockApproval, BlockHeadersRequest, BlockHeadersResponse, BlockRequest,
     BlockResponse, ChunkEndorsementMessage, SetNetworkInfo, StateRequestHeader, StateRequestPart,
+};
+use near_network::contract_distribution::{
+    ContractDistributionSenderForNetwork, SignedEncodedContractChangesMessage,
 };
 use near_network::shards_manager::ShardsManagerRequestFromNetwork;
 use near_network::state_witness::{
@@ -99,7 +101,7 @@ pub fn setup(
     Addr<ViewClientActor>,
     ShardsManagerAdapterForTest,
     PartialWitnessSenderForNetwork,
-    ContractDistributionSenderForClient,
+    ContractDistributionSenderForNetwork,
 ) {
     let store = create_test_store();
     let num_validator_seats = vs.all_block_producers().count() as NumSeats;
@@ -400,7 +402,7 @@ pub struct ActorHandlesForTesting {
     pub view_client_actor: Addr<ViewClientActor>,
     pub shards_manager_adapter: ShardsManagerAdapterForTest,
     pub partial_witness_sender: PartialWitnessSenderForNetwork,
-    pub contract_distribution_sender: ContractDistributionSenderForClient,
+    pub contract_distribution_sender: ContractDistributionSenderForNetwork,
 }
 
 fn send_chunks<T, I, F>(
@@ -782,11 +784,9 @@ fn process_peer_manager_message_default(
             for account in accounts {
                 for (i, name) in validators.iter().enumerate() {
                     if name == account {
-                        connectors[i].contract_distribution_sender.send(
-                            DistributeContractChangesRequest {
-                                contract_changes: contract_changes.clone(),
-                            },
-                        );
+                        connectors[i]
+                            .contract_distribution_sender
+                            .send(SignedEncodedContractChangesMessage(contract_changes.clone()));
                     }
                 }
             }

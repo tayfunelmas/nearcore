@@ -1,15 +1,19 @@
 use std::sync::Arc;
 
+use itertools::Itertools;
+use near_async::messaging::CanSend;
 use near_async::messaging::{Actor, Handler, Sender};
 use near_async::MultiSend;
 use near_async::MultiSenderFrom;
 use near_chain::Error;
-use near_chain_configs::{MutableConfigValue, MutableValidatorSigner};
+use near_chain_configs::MutableValidatorSigner;
 use near_epoch_manager::EpochManagerAdapter;
-use near_network::types::PeerManagerAdapter;
+use near_network::contract_distribution::SignedEncodedContractChangesMessage;
+use near_network::types::{NetworkRequests, PeerManagerAdapter, PeerManagerMessageRequest};
 use near_performance_metrics_macros::perf;
-use near_primitives::stateless_validation::contract_distribution::ContractChanges;
-use near_primitives::validator_signer::ValidatorSigner;
+use near_primitives::stateless_validation::contract_distribution::{
+    ContractChanges, SignedEncodedContractChanges,
+};
 
 use crate::Client;
 
@@ -40,8 +44,16 @@ pub struct ContractDistributionSenderForClient {
 impl Handler<DistributeContractChangesRequest> for ContractDistributionActor {
     #[perf]
     fn handle(&mut self, msg: DistributeContractChangesRequest) {
-        if let Err(err) = self.handle_distribute_contract_changes(msg) {
-            tracing::error!(target: "client", ?err, "Failed to handle distribute contract changes request");
+        if let Err(err) = self.handle_distribute_contract_changes(msg.contract_changes) {
+            tracing::error!(target: "client", ?err, "Failed to handle DistributeContractChangesRequest");
+        }
+    }
+}
+
+impl Handler<SignedEncodedContractChangesMessage> for ContractDistributionActor {
+    fn handle(&mut self, msg: SignedEncodedContractChangesMessage) {
+        if let Err(err) = self.handle_contract_changes_received(msg.0) {
+            tracing::error!(target: "client", ?err, "Failed to handle ContractChangesMessage");
         }
     }
 }
@@ -57,27 +69,39 @@ impl ContractDistributionActor {
 
     pub fn handle_distribute_contract_changes(
         &mut self,
-        msg: DistributeContractChangesRequest,
+        raw_changes: ContractChanges,
     ) -> Result<(), Error> {
-        // let DistributeStateWitnessRequest { epoch_id, chunk_header, state_witness } = msg;
+        let metadata = &raw_changes.metadata;
 
-        // tracing::debug!(
-        //     target: "client",
-        //     chunk_hash=?chunk_header.chunk_hash(),
-        //     "distribute_chunk_state_witness",
-        // );
+        tracing::debug!(target: "client", epoch_id=?metadata.epoch_id, shard_id=?metadata.shard_id, height=?metadata.height_created, "distribute_contract_changes");
 
-        // let signer = match self.my_signer.get() {
-        //     Some(signer) => signer,
-        //     None => {
-        //         return Err(Error::NotAValidator(format!("distribute state witness")));
-        //     }
-        // };
+        let signer = match self.my_signer.get() {
+            Some(signer) => signer,
+            None => {
+                return Err(Error::NotAValidator(format!("distribute contract changes")));
+            }
+        };
 
-        // let witness_bytes = compress_witness(&state_witness)?;
+        let validators = self
+            .epoch_manager
+            .get_epoch_all_validators(&metadata.epoch_id)?
+            .into_iter()
+            .map(|vs| vs.account_id().clone())
+            .collect_vec();
 
-        // self.send_state_witness_parts(epoch_id, chunk_header, witness_bytes, &signer)?;
+        let encoded_changes = SignedEncodedContractChanges::new(raw_changes, &signer)?;
 
+        self.network_adapter.send(PeerManagerMessageRequest::NetworkRequests(
+            NetworkRequests::ContractChanges(validators, encoded_changes),
+        ));
+
+        Ok(())
+    }
+
+    pub fn handle_contract_changes_received(
+        &mut self,
+        msg: SignedEncodedContractChanges,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -85,7 +109,7 @@ impl ContractDistributionActor {
 impl Client {
     pub fn process_contract_changes(
         &mut self,
-        contract_changes: ContractChanges,
+        contract_changes: SignedEncodedContractChanges,
     ) -> Result<(), Error> {
         // TODO
         Ok(())

@@ -21,6 +21,7 @@ pub mod client;
 pub mod concurrency;
 pub mod config;
 pub mod config_json;
+pub mod contract_distribution;
 pub mod debug;
 pub mod raw;
 pub mod routing;
