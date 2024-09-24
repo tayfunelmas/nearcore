@@ -1,6 +1,7 @@
 use crate::commands::*;
 use crate::congestion_control::CongestionControlCmd;
 use crate::contract_accounts::ContractAccountFilter;
+use crate::contract_changes::ContractChangesCmd;
 use crate::replay_headers::replay_headers;
 use crate::rocksdb_stats::get_rocksdb_stats;
 use crate::trie_iteration_benchmark::TrieIterationBenchmarkCmd;
@@ -121,6 +122,9 @@ pub enum StateViewerSubCommand {
     /// Tools for printing and recalculating the congestion information.
     #[clap(subcommand)]
     CongestionControl(CongestionControlCmd),
+
+    /// Tool to dump the contract changes between two block heights.
+    ContractChanges(ContractChangesCmd),
 }
 
 impl StateViewerSubCommand {
@@ -184,6 +188,7 @@ impl StateViewerSubCommand {
             StateViewerSubCommand::TrieIterationBenchmark(cmd) => cmd.run(near_config, store),
             StateViewerSubCommand::StateWitness(cmd) => cmd.run(home_dir, near_config, store),
             StateViewerSubCommand::CongestionControl(cmd) => cmd.run(home_dir, near_config, store),
+            StateViewerSubCommand::ContractChanges(cmd) => cmd.run(near_config, store),
         }
     }
 }

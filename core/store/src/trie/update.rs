@@ -6,8 +6,8 @@ use crate::trie::{KeyLookupMode, TrieChanges};
 use crate::StorageError;
 use near_primitives::trie_key::TrieKey;
 use near_primitives::types::{
-    RawStateChange, RawStateChanges, RawStateChangesWithTrieKey, StateChangeCause,
-    StateRoot, TrieCacheMode,
+    RawStateChange, RawStateChanges, RawStateChangesWithTrieKey, StateChangeCause, StateRoot,
+    TrieCacheMode,
 };
 use std::collections::BTreeMap;
 
