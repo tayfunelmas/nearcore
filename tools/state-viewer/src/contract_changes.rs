@@ -44,7 +44,7 @@ pub(crate) fn print_contract_changes(
     let start_height: BlockHeight = start_height.unwrap_or_else(|| chain_store.tail().unwrap());
     let end_height: BlockHeight = end_height.unwrap_or_else(|| chain_store.head().unwrap().height);
 
-    println!("Height, ShardId, NumDeployContractAction, NumDeleteAccount, TotalDeployedCodeSize");
+    println!("Height, ShardId, NumChanges, NumDeployContractAction, NumDeleteAccount, TotalDeployedCodeSize");
     for height in start_height..=end_height {
         if let Ok(block_hash) = chain_store.get_block_hash_by_height(height) {
             let block = chain_store.get_block(&block_hash).unwrap();
@@ -74,9 +74,10 @@ pub(crate) fn print_contract_changes(
                     }
                 }
                 println!(
-                    "{},{},{},{},{}",
+                    "{},{},{},{},{},{}",
                     line.height,
                     line.shard_id,
+                    line.num_deploys + line.num_deletes,
                     line.num_deploys,
                     line.num_deletes,
                     ByteSize::b(line.code_size)
