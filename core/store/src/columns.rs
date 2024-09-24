@@ -300,6 +300,10 @@ pub enum DBCol {
     /// - *Rows*: only one key with 0 bytes.
     /// - *Column type*: `EpochSyncProof`
     EpochSyncProof,
+    /// Column to store contract code.
+    /// - *Rows*: CryptoHash of the code
+    /// - *Column type*: Vec<u8> (code)
+    ContractCode,
 }
 
 /// Defines different logical parts of a db key.
@@ -335,6 +339,7 @@ pub enum DBKeyType {
     ColumnId,
     LatestWitnessesKey,
     LatestWitnessIndex,
+    CodeHash,
 }
 
 impl DBCol {
@@ -502,7 +507,8 @@ impl DBCol {
             | DBCol::FlatStateChanges
             | DBCol::FlatStateDeltaMetadata
             | DBCol::FlatStorageStatus
-            | DBCol::EpochSyncProof => false,
+            | DBCol::EpochSyncProof
+            | DBCol::ContractCode => false,
         }
     }
 
@@ -575,6 +581,7 @@ impl DBCol {
             DBCol::LatestChunkStateWitnesses => &[DBKeyType::LatestWitnessesKey],
             DBCol::LatestWitnessesByIndex => &[DBKeyType::LatestWitnessIndex],
             DBCol::EpochSyncProof => &[DBKeyType::Empty],
+            DBCol::ContractCode => &[DBKeyType::CodeHash],
         }
     }
 }

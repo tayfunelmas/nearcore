@@ -73,15 +73,18 @@ pub(crate) fn print_contract_changes(
                         }
                     }
                 }
-                println!(
-                    "{},{},{},{},{},{}",
-                    line.height,
-                    line.shard_id,
-                    line.num_deploys + line.num_deletes,
-                    line.num_deploys,
-                    line.num_deletes,
-                    ByteSize::b(line.code_size)
-                );
+                let num_ops = line.num_deploys + line.num_deletes;
+                if num_ops > 0 {
+                    println!(
+                        "{},{},{},{},{},{}",
+                        line.height,
+                        line.shard_id,
+                        num_ops,
+                        line.num_deploys,
+                        line.num_deletes,
+                        ByteSize::b(line.code_size)
+                    );
+                }
             }
         }
     }
