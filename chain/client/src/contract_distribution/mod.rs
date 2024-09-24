@@ -1,2 +1,2 @@
-pub mod logic;
 pub mod actor;
+pub mod logic;

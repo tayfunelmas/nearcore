@@ -1,10 +1,10 @@
-use crate::client_actor::ClientSenderForContractDistribution;
-use crate::contract_distribution::actor::ContractDistributionActor;
 use super::contract_distribution::SynchronousContractDistributionAdapter;
 use super::mock_partial_witness_adapter::MockPartialWitnessAdapter;
 use super::setup::{setup_client_with_runtime, setup_synchronous_shards_manager};
 use super::test_env::TestEnv;
 use super::{AccountIndices, TEST_SEED};
+use crate::client_actor::ClientSenderForContractDistribution;
+use crate::contract_distribution::actor::ContractDistributionActor;
 use actix_rt::System;
 use itertools::{multizip, Itertools};
 use near_async::messaging::{noop, IntoMultiSender, IntoSender};

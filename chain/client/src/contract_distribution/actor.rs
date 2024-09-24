@@ -14,8 +14,8 @@ use near_performance_metrics_macros::perf;
 use near_primitives::contract_distribution::{ContractChanges, SignedEncodedContractChanges};
 use near_store::Store;
 
-use crate::contract_distribution::logic::ContractChangesMessage;
 use crate::client_actor::ClientSenderForContractDistribution;
+use crate::contract_distribution::logic::ContractChangesMessage;
 use crate::stateless_validation::validate::validate_chunk_production_key;
 
 pub struct ContractDistributionActor {
