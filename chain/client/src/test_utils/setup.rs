@@ -160,11 +160,11 @@ pub fn setup(
         SyncAdapter::actix_actor_maker(),
     )));
 
-    let client_adapter_for_partial_witness_actor = LateBoundSender::new();
+    let client_adapter = LateBoundSender::new();
     let (partial_witness_addr, _) = spawn_actix_actor(PartialWitnessActor::new(
         clock.clone(),
         network_adapter.clone(),
-        client_adapter_for_partial_witness_actor.as_multi_sender(),
+        client_adapter.as_multi_sender(),
         signer.clone(),
         epoch_manager.clone(),
         store.clone(),
@@ -173,8 +173,10 @@ pub fn setup(
 
     let (contract_distribution_addr, _) = spawn_actix_actor(ContractDistributionActor::new(
         network_adapter.clone(),
+        client_adapter.as_multi_sender(),
         signer.clone(),
         epoch_manager.clone(),
+        store.clone(),
     ));
     let contract_distribution_adapter = contract_distribution_addr.with_auto_span_context();
 
@@ -215,7 +217,7 @@ pub fn setup(
     let shards_manager_adapter = shards_manager_addr.with_auto_span_context();
     shards_manager_adapter_for_client.bind(shards_manager_adapter.clone());
 
-    client_adapter_for_partial_witness_actor.bind(client_actor.clone().with_auto_span_context());
+    client_adapter.bind(client_actor.clone().with_auto_span_context());
 
     (
         client_actor,

@@ -11,6 +11,7 @@ use crate::client::{Client, EPOCH_START_INFO_BLOCKS};
 use crate::config_updater::ConfigUpdater;
 use crate::debug::new_network_info_view;
 use crate::info::{display_sync_status, InfoHelper};
+use crate::stateless_validation::contract_distribution::ContractChangesMessage;
 use crate::stateless_validation::partial_witness::partial_witness_actor::PartialWitnessSenderForClient;
 use crate::sync::adapter::{SyncMessage, SyncShardInfo};
 use crate::sync::state::{StateSync, StateSyncResult};
@@ -215,6 +216,11 @@ pub struct SyncJobsSenderForClient {
 #[derive(Clone, MultiSend, MultiSenderFrom)]
 pub struct ClientSenderForPartialWitness {
     pub chunk_state_witness: Sender<ChunkStateWitnessMessage>,
+}
+
+#[derive(Clone, MultiSend, MultiSenderFrom)]
+pub struct ClientSenderForContractDistribution {
+    pub contract_changes: Sender<ContractChangesMessage>,
 }
 
 // A small helper macro to unwrap a result of some state sync operation. If the
@@ -2220,6 +2226,15 @@ impl Handler<ChunkEndorsementMessage> for ClientActorInner {
     fn handle(&mut self, msg: ChunkEndorsementMessage) {
         if let Err(err) = self.client.process_chunk_endorsement(msg.0) {
             tracing::error!(target: "client", ?err, "Error processing chunk endorsement");
+        }
+    }
+}
+
+impl Handler<ContractChangesMessage> for ClientActorInner {
+    #[perf]
+    fn handle(&mut self, msg: ContractChangesMessage) {
+        if let Err(err) = self.client.process_contract_changes(msg.0) {
+            tracing::error!(target: "client", ?err, "Error processing contract changes");
         }
     }
 }

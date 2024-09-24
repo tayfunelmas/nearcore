@@ -6,16 +6,19 @@ use near_schema_checker_lib::ProtocolSchema;
 use std::io::Error;
 
 use crate::{
-    action::Action, sharding::ShardChunkHeader, types::EpochId, utils::compression::CompressedData,
+    action::Action,
+    sharding::{ChunkHash, ShardChunkHeader},
+    types::EpochId,
+    utils::compression::CompressedData,
     validator_signer::ValidatorSigner,
 };
 
-use super::{state_witness::ChunkStateTransition, SignatureDifferentiator};
+use super::{state_witness::ChunkStateTransition, ChunkProductionKey, SignatureDifferentiator};
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema)]
 pub struct SignedEncodedContractChanges {
     inner: EncodedContractChangesInner,
-    pub signature: Signature,
+    signature: Signature,
 }
 
 impl SignedEncodedContractChanges {
@@ -25,9 +28,17 @@ impl SignedEncodedContractChanges {
         Ok(Self { inner, signature })
     }
 
+    pub fn chunk_production_key(&self) -> ChunkProductionKey {
+        self.inner.metadata.chunk_production_key()
+    }
+
     pub fn verify(&self, public_key: &PublicKey) -> bool {
         let data = borsh::to_vec(&self.inner).unwrap();
         self.signature.verify(&data, public_key)
+    }
+
+    pub fn decode(&self) -> Result<(ContractChanges, usize), std::io::Error> {
+        self.inner.encoded_changes.decode()
     }
 }
 
@@ -51,18 +62,23 @@ impl EncodedContractChangesInner {
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema)]
 pub struct ContractChangesMetadata {
-    /// Chunk production metadata (shard_id, epoch_id, height_created):
     /// Epoch ID in which the chunk is created.
     pub epoch_id: EpochId,
     /// Block height at which this chunk is created.
     pub height_created: BlockHeight,
     /// Shard ID of the chunk.
     pub shard_id: ShardId,
+    // Hash of the chunk.
+    pub chunk_hash: ChunkHash,
 }
 
 impl ContractChangesMetadata {
-    pub fn new(epoch_id: EpochId, height_created: BlockHeight, shard_id: ShardId) -> Self {
-        Self { epoch_id, height_created, shard_id }
+    pub fn chunk_production_key(&self) -> ChunkProductionKey {
+        ChunkProductionKey {
+            shard_id: self.shard_id,
+            epoch_id: self.epoch_id,
+            height_created: self.height_created,
+        }
     }
 }
 
@@ -80,11 +96,12 @@ impl ContractChanges {
         state_transition: ChunkStateTransition,
         actions: Vec<Action>,
     ) -> Self {
-        let metadata = ContractChangesMetadata::new(
+        let metadata = ContractChangesMetadata {
             epoch_id,
-            chunk_header.height_created(),
-            chunk_header.shard_id(),
-        );
+            height_created: chunk_header.height_created(),
+            shard_id: chunk_header.shard_id(),
+            chunk_hash: chunk_header.chunk_hash(),
+        };
         Self { metadata, state_transition, actions }
     }
 }

@@ -477,12 +477,12 @@ impl TestEnv {
             network_adapter.handle_filtered(|request| match request {
                 PeerManagerMessageRequest::NetworkRequests(NetworkRequests::ContractChanges(
                     receivers,
-                    contract_changes,
+                    signed_encoded_changes,
                 )) => {
                     for receiver in receivers.into_iter() {
-                        let processing_result = self
-                            .client(&receiver)
-                            .process_contract_changes(contract_changes.clone());
+                        let (changes, _) = signed_encoded_changes.decode().unwrap();
+                        let processing_result =
+                            self.client(&receiver).process_contract_changes(changes);
                         if !allow_errors {
                             processing_result.unwrap();
                         }

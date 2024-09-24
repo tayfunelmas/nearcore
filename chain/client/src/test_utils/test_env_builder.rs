@@ -1,3 +1,4 @@
+use crate::client_actor::ClientSenderForContractDistribution;
 use crate::ContractDistributionActor;
 
 use super::contract_distribution::SynchronousContractDistributionAdapter;
@@ -7,7 +8,7 @@ use super::test_env::TestEnv;
 use super::{AccountIndices, TEST_SEED};
 use actix_rt::System;
 use itertools::{multizip, Itertools};
-use near_async::messaging::{IntoMultiSender, IntoSender};
+use near_async::messaging::{noop, IntoMultiSender, IntoSender};
 use near_async::time::Clock;
 use near_chain::state_snapshot_actor::SnapshotCallbacks;
 use near_chain::test_utils::{KeyValueRuntime, MockEpochManager, ValidatorSchedule};
@@ -520,12 +521,17 @@ impl TestEnvBuilder {
         let validator_signers = (0..num_clients)
             .map(|i| Arc::new(create_test_signer(clients[i].as_str())))
             .collect_vec();
+        // Since we directly propagate contract changes from network to client, there is no need for client sender.
+        let client_sender_for_contract_distribution =
+            ClientSenderForContractDistribution { contract_changes: noop().into_sender() };
         let contract_distribution_adapters = (0..num_clients)
             .map(|i| {
                 SynchronousContractDistributionAdapter::new(ContractDistributionActor::new(
                     network_adapters[i].clone().as_multi_sender(),
+                    client_sender_for_contract_distribution.clone(),
                     MutableConfigValue::new(Some(validator_signers[i].clone()), "validator_signer"),
                     epoch_managers[i].clone().into_adapter(),
+                    runtimes[i].store().clone(),
                 ))
             })
             .collect_vec();

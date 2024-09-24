@@ -721,16 +721,16 @@ impl EpochManagerAdapter for MockEpochManager {
         Ok(validators[(height as usize) % validators.len()].account_id().clone())
     }
 
-    fn get_chunk_producer(
+    fn get_chunk_producer_info(
         &self,
         epoch_id: &EpochId,
         height: BlockHeight,
         shard_id: ShardId,
-    ) -> Result<AccountId, EpochError> {
+    ) -> Result<ValidatorStake, EpochError> {
         let valset = self.get_valset_for_epoch(epoch_id)?;
         let chunk_producers = self.get_chunk_producers(valset, shard_id);
         let index = (shard_id + height + 1) as usize % chunk_producers.len();
-        Ok(chunk_producers[index].account_id().clone())
+        Ok(chunk_producers[index].clone())
     }
 
     fn get_chunk_validator_assignments(

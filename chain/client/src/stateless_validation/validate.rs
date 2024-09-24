@@ -52,7 +52,7 @@ pub fn validate_partial_encoded_state_witness(
     if !validate_chunk_production_key(
         epoch_manager,
         partial_witness.chunk_production_key(),
-        signer.validator_id(),
+        Some(signer.validator_id()),
         store,
     )? {
         return Ok(false);
@@ -75,7 +75,7 @@ pub fn validate_chunk_endorsement(
     if !validate_chunk_production_key(
         epoch_manager,
         endorsement.chunk_production_key(),
-        endorsement.account_id(),
+        Some(endorsement.account_id()),
         store,
     )? {
         return Ok(false);
@@ -98,10 +98,10 @@ pub fn validate_chunk_endorsement(
 /// - Ok(false) if ChunkProductionKey is potentially valid, but at this point we should not
 ///   process it. One example of that is if the witness is too old.
 /// - Err if ChunkProductionKey is invalid which most probably indicates malicious behavior.
-fn validate_chunk_production_key(
+pub fn validate_chunk_production_key(
     epoch_manager: &dyn EpochManagerAdapter,
     chunk_production_key: ChunkProductionKey,
-    account_id: &AccountId,
+    chunk_validator: Option<&AccountId>,
     store: &Store,
 ) -> Result<bool, Error> {
     let shard_id = chunk_production_key.shard_id;
@@ -119,10 +119,12 @@ fn validate_chunk_production_key(
 
     // Reject witnesses/endorsements for chunks for which the account_id isn't a validator.
     // It's an error, as chunk producer shouldn't send the witness/endorsement to/from a non-validator node.
-    let chunk_validator_assignments =
-        epoch_manager.get_chunk_validator_assignments(&epoch_id, shard_id, height_created)?;
-    if !chunk_validator_assignments.contains(account_id) {
-        return Err(Error::NotAChunkValidator);
+    if let Some(chunk_validator) = chunk_validator {
+        let chunk_validator_assignments =
+            epoch_manager.get_chunk_validator_assignments(&epoch_id, shard_id, height_created)?;
+        if !chunk_validator_assignments.contains(chunk_validator) {
+            return Err(Error::NotAChunkValidator);
+        }
     }
 
     // TODO(https://github.com/near/nearcore/issues/11301): replace these direct DB accesses with messages

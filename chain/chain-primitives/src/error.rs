@@ -140,6 +140,9 @@ pub enum Error {
     /// Invalid chunk mask
     #[error("Invalid Chunk Endorsement Bitmap")]
     InvalidChunkEndorsementBitmap(String),
+    /// Invalid contract changes message
+    #[error("Invalid Contract Changes")]
+    InvalidContractChanges(String),
     /// Invalid chunk mask
     #[error("Invalid Chunk Mask")]
     InvalidChunkMask,
@@ -281,6 +284,7 @@ impl Error {
             | Error::InvalidPartialChunkStateWitness(_)
             | Error::InvalidChunkEndorsement
             | Error::InvalidChunkEndorsementBitmap(_)
+            | Error::InvalidContractChanges(_)
             | Error::InvalidChunkMask
             | Error::InvalidStateRoot
             | Error::InvalidTxRoot
@@ -358,6 +362,7 @@ impl Error {
             Error::InvalidPartialChunkStateWitness(_) => "invalid_partial_chunk_state_witness",
             Error::InvalidChunkEndorsement => "invalid_chunk_endorsement",
             Error::InvalidChunkEndorsementBitmap(_) => "invalid_chunk_endorsement_bitmap",
+            Error::InvalidContractChanges(_) => "invalid_contract_changes",
             Error::InvalidChunkMask => "invalid_chunk_mask",
             Error::InvalidStateRoot => "invalid_state_root",
             Error::InvalidTxRoot => "invalid_tx_root",

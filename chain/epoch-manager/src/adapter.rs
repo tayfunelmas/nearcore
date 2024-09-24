@@ -211,7 +211,17 @@ pub trait EpochManagerAdapter: Send + Sync {
         epoch_id: &EpochId,
         height: BlockHeight,
         shard_id: ShardId,
-    ) -> Result<AccountId, EpochError>;
+    ) -> Result<AccountId, EpochError> {
+        Ok(self.get_chunk_producer_info(epoch_id, height, shard_id)?.take_account_id())
+    }
+
+    /// Chunk producer for given height for given shard. Return EpochError if outside of known boundaries.
+    fn get_chunk_producer_info(
+        &self,
+        epoch_id: &EpochId,
+        height: BlockHeight,
+        shard_id: ShardId,
+    ) -> Result<ValidatorStake, EpochError>;
 
     /// Gets the chunk validators for a given height and shard.
     fn get_chunk_validator_assignments(
@@ -723,14 +733,14 @@ impl EpochManagerAdapter for EpochManagerHandle {
         Ok(epoch_manager.get_block_producer_info(epoch_id, height)?.take_account_id())
     }
 
-    fn get_chunk_producer(
+    fn get_chunk_producer_info(
         &self,
         epoch_id: &EpochId,
         height: BlockHeight,
         shard_id: ShardId,
-    ) -> Result<AccountId, EpochError> {
+    ) -> Result<ValidatorStake, EpochError> {
         let epoch_manager = self.read();
-        Ok(epoch_manager.get_chunk_producer_info(epoch_id, height, shard_id)?.take_account_id())
+        epoch_manager.get_chunk_producer_info(epoch_id, height, shard_id)
     }
 
     fn get_chunk_validator_assignments(

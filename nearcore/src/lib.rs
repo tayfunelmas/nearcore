@@ -333,6 +333,7 @@ pub fn start_with_config_and_synchronization(
     let shards_manager_adapter = LateBoundSender::new();
     let client_adapter_for_shards_manager = LateBoundSender::new();
     let client_adapter_for_partial_witness_actor = LateBoundSender::new();
+    let client_adapter_for_contract_distribution = LateBoundSender::new();
     let adv = near_client::adversarial::Controls::new(config.client_config.archive);
 
     let view_client_addr = ViewClientActorInner::spawn_actix_actor(
@@ -379,8 +380,10 @@ pub fn start_with_config_and_synchronization(
     let (contract_distribution_actor, contract_distribution_arbiter) =
         spawn_actix_actor(ContractDistributionActor::new(
             network_adapter.as_multi_sender(),
+            client_adapter_for_contract_distribution.as_multi_sender(),
             config.validator_signer.clone(),
             epoch_manager.clone(),
+            runtime.store().clone(),
         ));
 
     let (_gc_actor, gc_arbiter) = spawn_actix_actor(GCActor::new(
@@ -419,6 +422,7 @@ pub fn start_with_config_and_synchronization(
     };
     client_adapter_for_shards_manager.bind(client_actor.clone().with_auto_span_context());
     client_adapter_for_partial_witness_actor.bind(client_actor.clone().with_auto_span_context());
+    client_adapter_for_contract_distribution.bind(client_actor.clone().with_auto_span_context());
     let (shards_manager_actor, shards_manager_arbiter_handle) = start_shards_manager(
         epoch_manager.clone(),
         view_epoch_manager.clone(),

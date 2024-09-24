@@ -443,13 +443,15 @@ impl TestLoopBuilder {
             client_adapter.as_multi_sender(),
             validator_signer.clone(),
             epoch_manager.clone(),
-            store,
+            store.clone(),
         );
 
         let contract_distribution_actor = ContractDistributionActor::new(
             network_adapter.as_multi_sender(),
+            client_adapter.as_multi_sender(),
             validator_signer.clone(),
             epoch_manager.clone(),
+            store,
         );
 
         let gc_actor = GCActor::new(
