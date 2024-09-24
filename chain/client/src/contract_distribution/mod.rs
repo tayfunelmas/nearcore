@@ -11,15 +11,12 @@ use near_epoch_manager::EpochManagerAdapter;
 use near_network::contract_distribution::SignedEncodedContractChangesMessage;
 use near_network::types::{NetworkRequests, PeerManagerAdapter, PeerManagerMessageRequest};
 use near_performance_metrics_macros::perf;
-use near_primitives::stateless_validation::contract_distribution::{
-    ContractChanges, SignedEncodedContractChanges,
-};
+use near_primitives::contract_distribution::{ContractChanges, SignedEncodedContractChanges};
 use near_store::Store;
 
 use crate::client_actor::ClientSenderForContractDistribution;
+use crate::stateless_validation::validate::validate_chunk_production_key;
 use crate::Client;
-
-use super::validate::validate_chunk_production_key;
 
 pub struct ContractDistributionActor {
     /// Adapter to send messages to the network.

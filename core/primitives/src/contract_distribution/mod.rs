@@ -8,12 +8,13 @@ use std::io::Error;
 use crate::{
     action::Action,
     sharding::{ChunkHash, ShardChunkHeader},
+    stateless_validation::{
+        state_witness::ChunkStateTransition, ChunkProductionKey, SignatureDifferentiator,
+    },
     types::EpochId,
     utils::compression::CompressedData,
     validator_signer::ValidatorSigner,
 };
-
-use super::{state_witness::ChunkStateTransition, ChunkProductionKey, SignatureDifferentiator};
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema)]
 pub struct SignedEncodedContractChanges {

@@ -4,7 +4,6 @@ use crate::types::EpochId;
 
 pub mod chunk_endorsement;
 pub mod chunk_endorsements_bitmap;
-pub mod contract_distribution;
 pub mod partial_witness;
 pub mod state_witness;
 pub mod stored_chunk_state_transition_data;
@@ -16,7 +15,7 @@ pub mod validator_assignment;
 /// this signature means something different.
 ///
 /// This is a messy workaround until we know what to do with NEP 483.
-type SignatureDifferentiator = String;
+pub type SignatureDifferentiator = String;
 
 /// This struct contains combination of fields that uniquely identify chunk production.
 /// It means that for a given instance only one chunk could be produced.

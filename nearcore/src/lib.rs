@@ -24,11 +24,12 @@ use near_chain_configs::ReshardingHandle;
 use near_chain_configs::SyncConfig;
 use near_chunks::shards_manager_actor::start_shards_manager;
 use near_client::adapter::client_sender_for_network;
+use near_client::contract_distribution::ContractDistributionActor;
 use near_client::gc_actor::GCActor;
 use near_client::sync::adapter::SyncAdapter;
 use near_client::{
-    start_client, ClientActor, ConfigUpdater, ContractDistributionActor, PartialWitnessActor,
-    StartClientResult, ViewClientActor, ViewClientActorInner,
+    start_client, ClientActor, ConfigUpdater, PartialWitnessActor, StartClientResult,
+    ViewClientActor, ViewClientActorInner,
 };
 use near_epoch_manager::shard_tracker::{ShardTracker, TrackedConfig};
 use near_epoch_manager::EpochManager;

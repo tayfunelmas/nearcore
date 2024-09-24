@@ -5,13 +5,15 @@
 use super::block_stats::BlockStats;
 use super::peer_manager_mock::PeerManagerMock;
 use crate::client_actor::ClientActorInner;
+use crate::contract_distribution::{
+    ContractDistributionActor, ContractDistributionSenderForClient,
+};
 use crate::stateless_validation::partial_witness::partial_witness_actor::{
     PartialWitnessActor, PartialWitnessSenderForClient,
 };
 use crate::{
-    start_client, Client, ClientActor, ContractDistributionActor,
-    ContractDistributionSenderForClient, StartClientResult, SyncAdapter, SyncStatus,
-    ViewClientActor, ViewClientActorInner,
+    start_client, Client, ClientActor, StartClientResult, SyncAdapter, SyncStatus, ViewClientActor,
+    ViewClientActorInner,
 };
 use actix::{Actor, Addr, Context};
 use futures::{future, FutureExt};

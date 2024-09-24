@@ -3,8 +3,7 @@ use std::sync::{Arc, Mutex};
 use near_async::messaging::CanSend;
 use near_network::contract_distribution::SignedEncodedContractChangesMessage;
 
-use crate::stateless_validation::contract_distribution::DistributeContractChangesRequest;
-use crate::ContractDistributionActor;
+use crate::contract_distribution::{ContractDistributionActor, DistributeContractChangesRequest};
 
 #[derive(Clone)]
 pub struct SynchronousContractDistributionAdapter(Arc<Mutex<ContractDistributionActor>>);

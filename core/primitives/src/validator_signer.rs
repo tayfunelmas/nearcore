@@ -6,13 +6,13 @@ use near_crypto::{InMemorySigner, KeyType, PublicKey, Signature, Signer};
 
 use crate::block::{Approval, ApprovalInner, BlockHeader};
 use crate::challenge::ChallengeBody;
+use crate::contract_distribution::EncodedContractChangesInner;
 use crate::hash::CryptoHash;
 use crate::network::{AnnounceAccount, PeerId};
 use crate::sharding::ChunkHash;
 use crate::stateless_validation::chunk_endorsement::{
     ChunkEndorsementInner, ChunkEndorsementMetadata,
 };
-use crate::stateless_validation::contract_distribution::EncodedContractChangesInner;
 use crate::stateless_validation::partial_witness::PartialEncodedStateWitnessInner;
 use crate::stateless_validation::state_witness::EncodedChunkStateWitness;
 use crate::telemetry::TelemetryInfo;

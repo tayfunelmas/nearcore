@@ -3,6 +3,7 @@
 
 use crate::chunk_distribution_network::{ChunkDistributionClient, ChunkDistributionNetwork};
 use crate::chunk_inclusion_tracker::ChunkInclusionTracker;
+use crate::contract_distribution::ContractDistributionSenderForClient;
 use crate::debug::BlockProductionTracker;
 use crate::debug::PRODUCTION_TIMES_CACHE_SIZE;
 use crate::stateless_validation::chunk_endorsement::ChunkEndorsementTracker;
@@ -13,8 +14,7 @@ use crate::sync::block::BlockSync;
 use crate::sync::header::HeaderSync;
 use crate::sync::state::{StateSync, StateSyncResult};
 use crate::SyncMessage;
-use crate::{metrics, SyncStatus};
-use crate::{ContractDistributionSenderForClient, SyncAdapter};
+use crate::{metrics, SyncAdapter, SyncStatus};
 use itertools::Itertools;
 use near_async::futures::{AsyncComputationSpawner, FutureSpawner};
 use near_async::messaging::IntoSender;

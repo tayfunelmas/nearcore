@@ -1,6 +1,6 @@
 use near_async::messaging::Sender;
 use near_async::{MultiSend, MultiSendMessage, MultiSenderFrom};
-use near_primitives::stateless_validation::contract_distribution::SignedEncodedContractChanges;
+use near_primitives::contract_distribution::SignedEncodedContractChanges;
 
 #[derive(actix::Message, Clone, Debug, PartialEq, Eq)]
 #[rtype(result = "()")]

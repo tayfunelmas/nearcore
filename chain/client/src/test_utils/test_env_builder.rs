@@ -1,5 +1,5 @@
 use crate::client_actor::ClientSenderForContractDistribution;
-use crate::ContractDistributionActor;
+use crate::contract_distribution::ContractDistributionActor;
 
 use super::contract_distribution::SynchronousContractDistributionAdapter;
 use super::mock_partial_witness_adapter::MockPartialWitnessAdapter;
