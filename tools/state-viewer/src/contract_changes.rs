@@ -1,3 +1,4 @@
+use bytesize::ByteSize;
 use near_chain::ChainStore;
 use near_chain::ChainStoreAccess;
 use near_primitives::{
@@ -26,7 +27,7 @@ struct ReportLine {
     shard_id: usize,
     num_deploys: usize,
     num_deletes: usize,
-    code_size: usize,
+    code_size: u64,
 }
 
 pub(crate) fn print_contract_changes(
@@ -40,7 +41,7 @@ pub(crate) fn print_contract_changes(
         near_config.genesis.config.genesis_height,
         near_config.client_config.save_trie_changes,
     );
-    let start_height: BlockHeight = start_height.unwrap_or_else(|| chain_store.tail());
+    let start_height: BlockHeight = start_height.unwrap_or_else(|| chain_store.tail().unwrap());
     let end_height: BlockHeight = end_height.unwrap_or_else(|| chain_store.head().unwrap().height);
 
     println!("Height, ShardId, NumDeployContractAction, NumDeleteAccount, TotalDeployedCodeSize");
@@ -63,7 +64,7 @@ pub(crate) fn print_contract_changes(
                         match action {
                             Action::DeployContract(DeployContractAction { code }) => {
                                 line.num_deploys += 1;
-                                line.code_size += code.len();
+                                line.code_size += code.len() as u64;
                             }
                             Action::DeleteAccount(_) => {
                                 line.num_deletes += 1;
@@ -74,7 +75,11 @@ pub(crate) fn print_contract_changes(
                 }
                 println!(
                     "{},{},{},{},{}",
-                    line.height, line.shard_id, line.num_deploys, line.num_deletes, line.code_size
+                    line.height,
+                    line.shard_id,
+                    line.num_deploys,
+                    line.num_deletes,
+                    ByteSize::b(line.code_size)
                 );
             }
         }
