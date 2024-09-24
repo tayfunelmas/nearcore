@@ -3,7 +3,7 @@
 
 use crate::chunk_distribution_network::{ChunkDistributionClient, ChunkDistributionNetwork};
 use crate::chunk_inclusion_tracker::ChunkInclusionTracker;
-use crate::contract_distribution::ContractDistributionSenderForClient;
+use crate::contract_distribution::actor::ContractDistributionSenderForClient;
 use crate::debug::BlockProductionTracker;
 use crate::debug::PRODUCTION_TIMES_CACHE_SIZE;
 use crate::stateless_validation::chunk_endorsement::ChunkEndorsementTracker;

@@ -1,6 +1,7 @@
 use bytesize::ByteSize;
 use near_chain::ChainStore;
 use near_chain::ChainStoreAccess;
+use near_primitives::types::ShardId;
 use near_primitives::{
     action::{Action, DeployContractAction},
     types::BlockHeight,
@@ -24,7 +25,7 @@ impl ContractChangesCmd {
 
 struct ReportLine {
     height: BlockHeight,
-    shard_id: usize,
+    shard_id: ShardId,
     num_deploys: usize,
     num_deletes: usize,
     code_size: u64,
@@ -49,16 +50,16 @@ pub(crate) fn print_contract_changes(
         if let Ok(block_hash) = chain_store.get_block_hash_by_height(height) {
             let block = chain_store.get_block(&block_hash).unwrap();
             let chunks = block.chunks();
-            for shard_id in 0..chunks.len() {
-                let mut line =
-                    ReportLine { height, shard_id, num_deploys: 0, num_deletes: 0, code_size: 0 };
-                let chunk_header = &chunks[shard_id];
+            for i in 0..chunks.len() {
+                let chunk_header = &chunks[i];
+                let shard_id = chunk_header.shard_id();
                 let is_new_chunk: bool = chunk_header.is_new_chunk(height);
                 if !is_new_chunk {
                     continue;
                 }
-                let chunk_hash = chunk_header.chunk_hash();
-                let chunk = chain_store.get_chunk(&chunk_hash).unwrap();
+                let mut line =
+                    ReportLine { height, shard_id, num_deploys: 0, num_deletes: 0, code_size: 0 };
+                let chunk = chain_store.get_chunk(&chunk_header.chunk_hash()).unwrap();
                 for tx in chunk.transactions() {
                     for action in tx.transaction.actions() {
                         match action {

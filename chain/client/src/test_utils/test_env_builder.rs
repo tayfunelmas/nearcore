@@ -1,6 +1,5 @@
 use crate::client_actor::ClientSenderForContractDistribution;
-use crate::contract_distribution::ContractDistributionActor;
-
+use crate::contract_distribution::actor::ContractDistributionActor;
 use super::contract_distribution::SynchronousContractDistributionAdapter;
 use super::mock_partial_witness_adapter::MockPartialWitnessAdapter;
 use super::setup::{setup_client_with_runtime, setup_synchronous_shards_manager};

@@ -19,7 +19,7 @@ use near_chain_configs::{
 };
 use near_chunks::shards_manager_actor::ShardsManagerActor;
 use near_client::client_actor::ClientActorInner;
-use near_client::contract_distribution::ContractDistributionActor;
+use near_client::contract_distribution::actor::ContractDistributionActor;
 use near_client::gc_actor::GCActor;
 use near_client::sync_jobs_actor::SyncJobsActor;
 use near_client::test_utils::test_loop::test_loop_sync_actor_maker;

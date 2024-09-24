@@ -6,7 +6,7 @@ use near_async::time::Duration;
 use near_chunks::adapter::ShardsManagerRequestFromClient;
 use near_chunks::shards_manager_actor::ShardsManagerActor;
 use near_client::client_actor::ClientActorInner;
-use near_client::contract_distribution::ContractDistributionActor;
+use near_client::contract_distribution::actor::ContractDistributionActor;
 use near_client::{PartialWitnessActor, ViewClientActorInner};
 use near_jsonrpc::ViewClientSenderForRpc;
 use near_network::shards_manager::ShardsManagerRequestFromNetwork;

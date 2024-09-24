@@ -5,9 +5,7 @@
 use super::block_stats::BlockStats;
 use super::peer_manager_mock::PeerManagerMock;
 use crate::client_actor::ClientActorInner;
-use crate::contract_distribution::{
-    ContractDistributionActor, ContractDistributionSenderForClient,
-};
+use crate::contract_distribution::actor::{ContractDistributionActor, ContractDistributionSenderForClient};
 use crate::stateless_validation::partial_witness::partial_witness_actor::{
     PartialWitnessActor, PartialWitnessSenderForClient,
 };
