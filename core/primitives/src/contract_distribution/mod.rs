@@ -1,20 +1,98 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use bytesize::ByteSize;
 use near_crypto::{PublicKey, Signature};
-use near_primitives_core::types::{BlockHeight, ShardId};
+use near_primitives_core::{
+    hash::CryptoHash,
+    types::{BlockHeight, ShardId},
+};
 use near_schema_checker_lib::ProtocolSchema;
 use std::io::Error;
 
 use crate::{
-    action::Action,
     sharding::{ChunkHash, ShardChunkHeader},
-    stateless_validation::{
-        state_witness::ChunkStateTransition, ChunkProductionKey, SignatureDifferentiator,
-    },
+    stateless_validation::{ChunkProductionKey, SignatureDifferentiator},
     types::EpochId,
     utils::compression::CompressedData,
     validator_signer::ValidatorSigner,
 };
+
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema)]
+pub struct CodeHash(pub CryptoHash);
+
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema)]
+pub struct ContractCode(Vec<u8>);
+
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema)]
+pub struct ContractChangesMetadata {
+    /// Epoch ID in which the chunk is created.
+    pub epoch_id: EpochId,
+    /// Block height at which this chunk is created.
+    pub height_created: BlockHeight,
+    /// Shard ID of the chunk.
+    pub shard_id: ShardId,
+    // Hash of the chunk.
+    pub chunk_hash: ChunkHash,
+}
+
+impl ContractChangesMetadata {
+    pub fn chunk_production_key(&self) -> ChunkProductionKey {
+        ChunkProductionKey {
+            shard_id: self.shard_id,
+            epoch_id: self.epoch_id,
+            height_created: self.height_created,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema)]
+pub struct ContractChanges {
+    pub metadata: ContractChangesMetadata,
+    pub deployments: Vec<ContractCode>,
+    pub deletions: Vec<CodeHash>,
+}
+
+impl ContractChanges {
+    pub fn new(
+        epoch_id: EpochId,
+        chunk_header: &ShardChunkHeader,
+        deployments: Vec<ContractCode>,
+        deletions: Vec<CodeHash>,
+    ) -> Self {
+        let metadata = ContractChangesMetadata {
+            epoch_id,
+            height_created: chunk_header.height_created(),
+            shard_id: chunk_header.shard_id(),
+            chunk_hash: chunk_header.chunk_hash(),
+        };
+        Self { metadata, deployments, deletions }
+    }
+}
+
+pub const MAX_UNCOMPRESSED_CONTRACT_CHANGES_SIZE: u64 =
+    ByteSize::mib(if cfg!(feature = "test_features") { 512 } else { 64 }).0;
+pub const CONTRACT_CHANGES_COMPRESSION_LEVEL: i32 = 3;
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    BorshSerialize,
+    BorshDeserialize,
+    ProtocolSchema,
+    derive_more::From,
+    derive_more::AsRef,
+)]
+pub struct EncodedContractChanges(Box<[u8]>);
+
+impl
+    CompressedData<
+        ContractChanges,
+        MAX_UNCOMPRESSED_CONTRACT_CHANGES_SIZE,
+        CONTRACT_CHANGES_COMPRESSION_LEVEL,
+    > for EncodedContractChanges
+{
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema)]
 pub struct SignedEncodedContractChanges {
@@ -59,76 +137,4 @@ impl EncodedContractChangesInner {
             signature_differentiator: "ContractChanges".to_owned(),
         })
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema)]
-pub struct ContractChangesMetadata {
-    /// Epoch ID in which the chunk is created.
-    pub epoch_id: EpochId,
-    /// Block height at which this chunk is created.
-    pub height_created: BlockHeight,
-    /// Shard ID of the chunk.
-    pub shard_id: ShardId,
-    // Hash of the chunk.
-    pub chunk_hash: ChunkHash,
-}
-
-impl ContractChangesMetadata {
-    pub fn chunk_production_key(&self) -> ChunkProductionKey {
-        ChunkProductionKey {
-            shard_id: self.shard_id,
-            epoch_id: self.epoch_id,
-            height_created: self.height_created,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema)]
-pub struct ContractChanges {
-    pub metadata: ContractChangesMetadata,
-    pub state_transition: ChunkStateTransition,
-    pub actions: Vec<Action>,
-}
-
-impl ContractChanges {
-    pub fn new(
-        epoch_id: EpochId,
-        chunk_header: &ShardChunkHeader,
-        state_transition: ChunkStateTransition,
-        actions: Vec<Action>,
-    ) -> Self {
-        let metadata = ContractChangesMetadata {
-            epoch_id,
-            height_created: chunk_header.height_created(),
-            shard_id: chunk_header.shard_id(),
-            chunk_hash: chunk_header.chunk_hash(),
-        };
-        Self { metadata, state_transition, actions }
-    }
-}
-
-pub const MAX_UNCOMPRESSED_CONTRACT_CHANGES_SIZE: u64 =
-    ByteSize::mib(if cfg!(feature = "test_features") { 512 } else { 64 }).0;
-pub const CONTRACT_CHANGES_COMPRESSION_LEVEL: i32 = 3;
-
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    BorshSerialize,
-    BorshDeserialize,
-    ProtocolSchema,
-    derive_more::From,
-    derive_more::AsRef,
-)]
-pub struct EncodedContractChanges(Box<[u8]>);
-
-impl
-    CompressedData<
-        ContractChanges,
-        MAX_UNCOMPRESSED_CONTRACT_CHANGES_SIZE,
-        CONTRACT_CHANGES_COMPRESSION_LEVEL,
-    > for EncodedContractChanges
-{
 }
