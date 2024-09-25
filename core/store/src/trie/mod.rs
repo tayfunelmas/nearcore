@@ -4,6 +4,7 @@ use self::mem::flexible_data::value::ValueView;
 use self::mem::updating::{UpdatedMemTrieNode, UpdatedMemTrieNodeId};
 use self::trie_recording::TrieRecorder;
 use self::trie_storage::TrieMemoryPartialStorage;
+use crate::contract::ContractStorage;
 use crate::flat::{FlatStateChanges, FlatStorageChunkView};
 pub use crate::trie::config::TrieConfig;
 pub(crate) use crate::trie::config::{
@@ -336,6 +337,7 @@ impl std::fmt::Debug for TrieNode {
 
 pub struct Trie {
     storage: Arc<dyn TrieStorage>,
+    contract_storage: ContractStorage,
     memtries: Option<Arc<RwLock<MemTries>>>,
     root: StateRoot,
     /// If present, flat storage is used to look up keys (if asked for).
@@ -659,14 +661,16 @@ impl Trie {
     /// (only in this crate), call self.accounting_cache.borrow_mut().set_enabled().
     pub fn new(
         storage: Arc<dyn TrieStorage>,
+        contract_storage: ContractStorage,
         root: StateRoot,
         flat_storage_chunk_view: Option<FlatStorageChunkView>,
     ) -> Self {
-        Self::new_with_memtries(storage, None, root, flat_storage_chunk_view)
+        Self::new_with_memtries(storage, contract_storage, None, root, flat_storage_chunk_view)
     }
 
     pub fn new_with_memtries(
         storage: Arc<dyn TrieStorage>,
+        contract_storage: ContractStorage,
         memtries: Option<Arc<RwLock<MemTries>>>,
         root: StateRoot,
         flat_storage_chunk_view: Option<FlatStorageChunkView>,
@@ -680,6 +684,7 @@ impl Trie {
         };
         Trie {
             storage,
+            contract_storage,
             memtries,
             root,
             charge_gas_for_trie_node_access: flat_storage_chunk_view.is_none(),
@@ -699,6 +704,7 @@ impl Trie {
     pub fn recording_reads(&self) -> Self {
         let mut trie = Self::new_with_memtries(
             self.storage.clone(),
+            self.contract_storage.clone(),
             self.memtries.clone(),
             self.root,
             self.flat_storage_chunk_view.clone(),
@@ -740,13 +746,14 @@ impl Trie {
     /// same costs as if flat storage were present.
     pub fn from_recorded_storage(
         partial_storage: PartialStorage,
+        contract_storage: ContractStorage,
         root: StateRoot,
         flat_storage_used: bool,
     ) -> Self {
         let PartialState::TrieValues(nodes) = partial_storage.nodes;
         let recorded_storage = nodes.into_iter().map(|value| (hash(&value), value)).collect();
         let storage = Arc::new(TrieMemoryPartialStorage::new(recorded_storage));
-        let mut trie = Self::new(storage, root, None);
+        let mut trie = Self::new(storage, contract_storage, root, None);
         trie.charge_gas_for_trie_node_access = !flat_storage_used;
         trie
     }
@@ -790,6 +797,10 @@ impl Trie {
             let mut r = recorder.borrow_mut();
             r.record_code_len(value_ref.len());
         }
+    }
+
+    pub fn contract_storage(&self) -> &ContractStorage {
+        &self.contract_storage
     }
 
     #[cfg(feature = "test_features")]

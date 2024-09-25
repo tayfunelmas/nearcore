@@ -54,10 +54,10 @@ impl<'a> TrieUpdateValuePtr<'a> {
 
 impl TrieUpdate {
     pub fn new(trie: Trie) -> Self {
-        let trie_storage = trie.storage.clone();
+        let contract_storage = trie.contract_storage.clone();
         Self {
             trie,
-            contract_storage: ContractStorage::new(trie_storage),
+            contract_storage,
             committed: Default::default(),
             prospective: Default::default(),
         }
