@@ -1,8 +1,67 @@
 use crate::TrieStorage;
-use near_primitives::hash::CryptoHash;
+use near_primitives::types::CodeHash;
 use near_vm_runner::ContractCode;
+use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
+
+#[derive(Default)]
+struct ContractCodeWithRefcount {
+    code: Option<ContractCode>,
+    refcount_delta: u64,
+}
+
+impl ContractCodeWithRefcount {
+    fn new(code: Option<ContractCode>) -> Self {
+        Self { code, refcount_delta: 0 }
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct ContractChangesTracker {
+    changes: Arc<RwLock<BTreeMap<CodeHash, ContractCodeWithRefcount>>>,
+}
+
+impl ContractChangesTracker {
+    fn record_deploy(&self, code: ContractCode) {
+        let mut guard = self.changes.write().expect("no panics");
+        let changes = match guard.entry(*code.hash()) {
+            Entry::Occupied(o) => {
+                let changes = o.into_mut();
+                if changes.code.is_none() {
+                    changes.code = Some(code);
+                }
+                changes
+            }
+            Entry::Vacant(v) => v.insert(ContractCodeWithRefcount::new(Some(ContractCode::new(
+                code.code().to_vec(),
+                Some(*code.hash()),
+            )))),
+        };
+        changes.refcount_delta += 1;
+    }
+
+    fn record_delete(&self, code_hash: &CodeHash) {
+        let mut guard = self.changes.write().expect("no panics");
+        let changes = match guard.entry(*code_hash) {
+            Entry::Occupied(o) => o.into_mut(),
+            Entry::Vacant(v) => v.insert(ContractCodeWithRefcount::new(None)),
+        };
+        changes.refcount_delta -= 1;
+    }
+
+    fn get(&self, code_hash: &CodeHash) -> Option<ContractCode> {
+        // Note: We do not check the refcount but always return the code.
+        let guard = self.changes.read().expect("no panics");
+        if let Some(changes) = guard.get(code_hash) {
+            if let Some(code) = changes.code.as_ref() {
+                debug_assert_eq!(code.hash(), code_hash);
+                return Some(ContractCode::new(code.code().to_vec(), Some(*code_hash)));
+            }
+        }
+        None
+    }
+}
 
 /// Reads contract code from the trie by its hash.
 ///
@@ -23,20 +82,17 @@ pub struct ContractStorage {
     /// The State this field should be removed, and the `Storage::store` function should be
     /// adjusted to write out the contract into the relevant part of the database immediately
     /// (without going through transactional storage operations and such).
-    uncommitted_deploys: Arc<Mutex<BTreeMap<CryptoHash, ContractCode>>>,
+    uncommitted_changes: ContractChangesTracker,
 }
 
 impl ContractStorage {
     pub fn new(storage: Arc<dyn TrieStorage>) -> Self {
-        Self { storage, uncommitted_deploys: Default::default() }
+        Self { storage, uncommitted_changes: Default::default() }
     }
 
-    pub fn get(&self, code_hash: CryptoHash) -> Option<ContractCode> {
-        {
-            let guard = self.uncommitted_deploys.lock().expect("no panics");
-            if let Some(v) = guard.get(&code_hash) {
-                return Some(ContractCode::new(v.code().to_vec(), Some(code_hash)));
-            }
+    pub fn get(&self, code_hash: CodeHash) -> Option<ContractCode> {
+        if let Some(v) = self.uncommitted_changes.get(&code_hash) {
+            return Some(ContractCode::new(v.code().to_vec(), Some(code_hash)));
         }
 
         match self.storage.retrieve_raw_bytes(&code_hash) {
@@ -46,7 +102,10 @@ impl ContractStorage {
     }
 
     pub fn store(&self, code: ContractCode) {
-        let mut guard = self.uncommitted_deploys.lock().expect("no panics");
-        guard.insert(*code.hash(), code);
+        self.uncommitted_changes.record_deploy(code);
+    }
+
+    pub fn delete(&self, code_hash: &CodeHash) {
+        self.uncommitted_changes.record_delete(code_hash);
     }
 }

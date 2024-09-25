@@ -679,6 +679,11 @@ pub(crate) fn action_delete_account(
             ReceiptPriority::NoPriority,
         ));
     }
+    let code_hash = account.as_ref().unwrap().code_hash();
+    if code_hash != CryptoHash::default() {
+        // Inform the `store::contract::Storage` about the deletion of the account with the code.
+        state_update.contract_storage.delete(&code_hash);
+    }
     remove_account(state_update, account_id)?;
     *actor_id = receipt.predecessor_id().clone();
     *account = None;

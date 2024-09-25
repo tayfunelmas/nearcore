@@ -1,10 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use bytesize::ByteSize;
 use near_crypto::{PublicKey, Signature};
-use near_primitives_core::{
-    hash::CryptoHash,
-    types::{BlockHeight, ShardId},
-};
+use near_primitives_core::types::{BlockHeight, CodeHash, ShardId};
 use near_schema_checker_lib::ProtocolSchema;
 use std::io::Error;
 
@@ -15,9 +12,6 @@ use crate::{
     utils::compression::CompressedData,
     validator_signer::ValidatorSigner,
 };
-
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema)]
-pub struct CodeHash(pub CryptoHash);
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema)]
 pub struct ContractCode(Vec<u8>);
