@@ -46,5 +46,7 @@ pub type PromiseId = Vec<ReceiptIndex>;
 
 pub type ProtocolVersion = u32;
 
-// Type of the hash of the contract code.
+/// Type of the hash of the contract code.
 pub type CodeHash = CryptoHash;
+// Type of the contract code.
+pub type CodeBytes = Vec<u8>;

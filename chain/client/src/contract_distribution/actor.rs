@@ -11,7 +11,7 @@ use near_epoch_manager::EpochManagerAdapter;
 use near_network::contract_distribution::SignedEncodedContractChangesMessage;
 use near_network::types::{NetworkRequests, PeerManagerAdapter, PeerManagerMessageRequest};
 use near_performance_metrics_macros::perf;
-use near_primitives::contract_distribution::{ContractChanges, SignedEncodedContractChanges};
+use near_primitives::contract_distribution::{ChunkContractChanges, SignedEncodedContractChanges};
 use near_store::Store;
 
 use crate::client_actor::ClientSenderForContractDistribution;
@@ -36,7 +36,7 @@ impl Actor for ContractDistributionActor {}
 #[derive(actix::Message, Debug)]
 #[rtype(result = "()")]
 pub struct DistributeContractChangesRequest {
-    pub contract_changes: ContractChanges,
+    pub contract_changes: ChunkContractChanges,
 }
 
 #[derive(Clone, MultiSend, MultiSenderFrom)]
@@ -74,7 +74,7 @@ impl ContractDistributionActor {
 
     pub fn handle_distribute_contract_changes(
         &mut self,
-        raw_changes: ContractChanges,
+        raw_changes: ChunkContractChanges,
     ) -> Result<(), Error> {
         let metadata = &raw_changes.metadata;
 

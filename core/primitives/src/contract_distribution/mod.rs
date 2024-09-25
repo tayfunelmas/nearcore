@@ -1,7 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use bytesize::ByteSize;
 use near_crypto::{PublicKey, Signature};
-use near_primitives_core::types::{BlockHeight, CodeHash, ShardId};
+use near_primitives_core::types::{BlockHeight, CodeBytes, CodeHash, ShardId};
 use near_schema_checker_lib::ProtocolSchema;
 use std::io::Error;
 
@@ -12,9 +12,6 @@ use crate::{
     utils::compression::CompressedData,
     validator_signer::ValidatorSigner,
 };
-
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema)]
-pub struct ContractCode(Vec<u8>);
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema)]
 pub struct ContractChangesMetadata {
@@ -39,18 +36,28 @@ impl ContractChangesMetadata {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema)]
-pub struct ContractChanges {
+pub struct ChunkContractChanges {
     pub metadata: ContractChangesMetadata,
-    pub deployments: Vec<ContractCode>,
-    pub deletions: Vec<CodeHash>,
+    pub changes: ContractChanges,
 }
 
-impl ContractChanges {
+#[derive(
+    Debug, Default, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema,
+)]
+pub struct ContractChanges(pub Vec<ContractChange>);
+
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema)]
+pub struct ContractChange {
+    pub code_hash: CodeHash,
+    pub code: Option<CodeBytes>,
+    pub refcount_delta: u64,
+}
+
+impl ChunkContractChanges {
     pub fn new(
         epoch_id: EpochId,
         chunk_header: &ShardChunkHeader,
-        deployments: Vec<ContractCode>,
-        deletions: Vec<CodeHash>,
+        changes: ContractChanges,
     ) -> Self {
         let metadata = ContractChangesMetadata {
             epoch_id,
@@ -58,7 +65,7 @@ impl ContractChanges {
             shard_id: chunk_header.shard_id(),
             chunk_hash: chunk_header.chunk_hash(),
         };
-        Self { metadata, deployments, deletions }
+        Self { metadata, changes }
     }
 }
 
@@ -81,7 +88,7 @@ pub struct EncodedContractChanges(Box<[u8]>);
 
 impl
     CompressedData<
-        ContractChanges,
+        ChunkContractChanges,
         MAX_UNCOMPRESSED_CONTRACT_CHANGES_SIZE,
         CONTRACT_CHANGES_COMPRESSION_LEVEL,
     > for EncodedContractChanges
@@ -95,7 +102,10 @@ pub struct SignedEncodedContractChanges {
 }
 
 impl SignedEncodedContractChanges {
-    pub fn new(contract_changes: ContractChanges, signer: &ValidatorSigner) -> Result<Self, Error> {
+    pub fn new(
+        contract_changes: ChunkContractChanges,
+        signer: &ValidatorSigner,
+    ) -> Result<Self, Error> {
         let inner = EncodedContractChangesInner::new(contract_changes)?;
         let signature = signer.sign_contract_changes(&inner);
         Ok(Self { inner, signature })
@@ -110,7 +120,7 @@ impl SignedEncodedContractChanges {
         self.signature.verify(&data, public_key)
     }
 
-    pub fn decode(&self) -> Result<(ContractChanges, usize), std::io::Error> {
+    pub fn decode(&self) -> Result<(ChunkContractChanges, usize), std::io::Error> {
         self.inner.encoded_changes.decode()
     }
 }
@@ -123,7 +133,7 @@ pub struct EncodedContractChangesInner {
 }
 
 impl EncodedContractChangesInner {
-    fn new(contract_changes: ContractChanges) -> Result<Self, Error> {
+    fn new(contract_changes: ChunkContractChanges) -> Result<Self, Error> {
         let (encoded_changes, _raw_size) = EncodedContractChanges::encode(&contract_changes)?;
         Ok(Self {
             metadata: contract_changes.metadata,

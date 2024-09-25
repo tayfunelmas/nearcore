@@ -1,4 +1,5 @@
 use crate::TrieStorage;
+use near_primitives::contract_distribution::{ContractChange, ContractChanges};
 use near_primitives::types::CodeHash;
 use near_vm_runner::ContractCode;
 use std::collections::btree_map::Entry;
@@ -60,6 +61,21 @@ impl ContractChangesTracker {
             }
         }
         None
+    }
+
+    fn changes(&self) -> ContractChanges {
+        let mut changes = ContractChanges::default();
+        let guard = self.changes.read().expect("no panics");
+        for (code_hash, code_with_refcount) in guard.iter() {
+            if code_with_refcount.refcount_delta != 0 {
+                changes.0.push(ContractChange {
+                    code_hash: *code_hash,
+                    code: code_with_refcount.code.as_ref().map(|c| c.code().to_vec()),
+                    refcount_delta: code_with_refcount.refcount_delta,
+                });
+            }
+        }
+        changes
     }
 }
 
