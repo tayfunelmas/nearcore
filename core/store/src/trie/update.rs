@@ -216,10 +216,10 @@ impl TrieUpdate {
 
     fn get_from_updates(
         &self,
-        key: &TrieKey,
-        fallback: impl FnOnce(&[u8]) -> Result<Option<Vec<u8>>, StorageError>,
+        trie_key: &TrieKey,
+        fallback: impl FnOnce(&TrieKey) -> Result<Option<Vec<u8>>, StorageError>,
     ) -> Result<Option<Vec<u8>>, StorageError> {
-        let key = key.to_vec();
+        let key = trie_key.to_vec();
         if let Some(key_value) = self.prospective.get(&key) {
             return Ok(key_value.value.as_ref().map(<Vec<u8>>::clone));
         } else if let Some(changes_with_trie_key) = self.committed.get(&key) {
@@ -227,17 +227,17 @@ impl TrieUpdate {
                 return Ok(data.as_ref().map(<Vec<u8>>::clone));
             }
         }
-        fallback(&key)
+        fallback(&trie_key)
     }
 }
 
 impl crate::TrieAccess for TrieUpdate {
     fn get(&self, key: &TrieKey) -> Result<Option<Vec<u8>>, StorageError> {
-        self.get_from_updates(key, |k| self.trie.get(k))
+        self.get_from_updates(key, |_| self.trie.get(key))
     }
 
     fn get_no_side_effects(&self, key: &TrieKey) -> Result<Option<Vec<u8>>, StorageError> {
-        self.get_from_updates(key, |_| self.trie.get_no_side_effects(&key))
+        self.get_from_updates(key, |_| self.trie.get_no_side_effects(key))
     }
 
     fn contains_key(&self, key: &TrieKey) -> Result<bool, StorageError> {

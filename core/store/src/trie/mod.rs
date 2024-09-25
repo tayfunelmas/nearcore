@@ -1590,8 +1590,17 @@ impl Trie {
         }
     }
 
+    pub fn get(&self, key: &TrieKey) -> Result<Option<Vec<u8>>, StorageError> {
+        self.get_impl(&key.to_vec(), matches!(key, TrieKey::ContractCode { .. }))
+    }
+
     /// Retrieves the full value for the given key.
-    pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, StorageError> {
+    /// TODO(#11099): Make this pub(crate) only.
+    pub fn get_impl(
+        &self,
+        key: &[u8],
+        _is_contract_code: bool,
+    ) -> Result<Option<Vec<u8>>, StorageError> {
         match self.get_optimized_ref(key, KeyLookupMode::FlatStorage)? {
             Some(optimized_ref) => Ok(Some(self.deref_optimized(&optimized_ref)?)),
             None => Ok(None),
@@ -1610,7 +1619,7 @@ impl Trie {
         };
         for account_id in codes_to_record {
             let trie_key = TrieKey::ContractCode { account_id: account_id.clone() };
-            let _ = self.get(&trie_key.to_vec());
+            let _ = self.get(&trie_key);
         }
 
         match &self.memtries {
@@ -1741,7 +1750,7 @@ impl<'a> TrieWithReadLock<'a> {
 
 impl TrieAccess for Trie {
     fn get(&self, key: &TrieKey) -> Result<Option<Vec<u8>>, StorageError> {
-        Trie::get(self, &key.to_vec())
+        Trie::get(self, key)
     }
 
     fn get_no_side_effects(&self, key: &TrieKey) -> Result<Option<Vec<u8>>, StorageError> {
@@ -1846,7 +1855,7 @@ mod tests {
         let trie = tries.get_trie_for_shard(shard_uid, root);
         store_update.commit().unwrap();
         for (key, _) in changes {
-            assert_eq!(trie.get(&key), Ok(None));
+            assert_eq!(trie.get_impl(&key, false), Ok(None));
         }
         root
     }
@@ -1857,7 +1866,7 @@ mod tests {
         let tries = TestTriesBuilder::new().with_shard_layout(SHARD_VERSION, 2).build();
         let shard_uid = ShardUId { version: SHARD_VERSION, shard_id: 0 };
         let trie = tries.get_trie_for_shard(shard_uid, Trie::EMPTY_ROOT);
-        assert_eq!(trie.get(&[122]), Ok(None));
+        assert_eq!(trie.get_impl(&[122], false), Ok(None));
         let changes = vec![
             (b"doge".to_vec(), Some(b"coin".to_vec())),
             (b"docu".to_vec(), Some(b"value".to_vec())),
@@ -2170,7 +2179,7 @@ mod tests {
 
         let tries2 = TestTriesBuilder::new().with_store(store).build();
         let trie2 = tries2.get_trie_for_shard(ShardUId::single_shard(), root);
-        assert_eq!(trie2.get(b"doge"), Ok(Some(b"coin".to_vec())));
+        assert_eq!(trie2.get_impl(b"doge", false), Ok(Some(b"coin".to_vec())));
     }
 
     // TODO: somehow also test that we don't record unnecessary nodes
@@ -2189,16 +2198,16 @@ mod tests {
         let root = test_populate_trie(&tries, &empty_root, ShardUId::single_shard(), changes);
 
         let trie2 = tries.get_trie_for_shard(ShardUId::single_shard(), root).recording_reads();
-        trie2.get(b"dog").unwrap();
-        trie2.get(b"horse").unwrap();
+        trie2.get_impl(b"dog", false).unwrap();
+        trie2.get_impl(b"horse", false).unwrap();
         let partial_storage = trie2.recorded_storage();
 
         let trie3 = Trie::from_recorded_storage(partial_storage.unwrap(), root, false);
 
-        assert_eq!(trie3.get(b"dog"), Ok(Some(b"puppy".to_vec())));
-        assert_eq!(trie3.get(b"horse"), Ok(Some(b"stallion".to_vec())));
+        assert_eq!(trie3.get_impl(b"dog", false), Ok(Some(b"puppy".to_vec())));
+        assert_eq!(trie3.get_impl(b"horse", false), Ok(Some(b"stallion".to_vec())));
         assert_matches!(
-            trie3.get(b"doge"),
+            trie3.get_impl(b"doge", false),
             Err(StorageError::MissingTrieValue(
                 MissingTrieValueContext::TrieMemoryPartialStorage,
                 _
@@ -2218,7 +2227,7 @@ mod tests {
         // Trie: extension -> branch -> 2 leaves
         {
             let trie2 = tries.get_trie_for_shard(ShardUId::single_shard(), root).recording_reads();
-            trie2.get(b"doge").unwrap();
+            trie2.get_impl(b"doge", false).unwrap();
             // record extension, branch and one leaf with value, but not the other
             assert_eq!(trie2.recorded_storage().unwrap().nodes.len(), 4);
         }
@@ -2256,7 +2265,7 @@ mod tests {
         store2.load_state_from_file(&dir.path().join("test.bin")).unwrap();
         let tries2 = TestTriesBuilder::new().with_store(store2).build();
         let trie2 = tries2.get_trie_for_shard(ShardUId::single_shard(), root);
-        assert_eq!(trie2.get(b"doge").unwrap().unwrap(), b"coin");
+        assert_eq!(trie2.get_impl(b"doge", false).unwrap().unwrap(), b"coin");
     }
 }
 

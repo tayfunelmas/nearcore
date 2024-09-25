@@ -488,9 +488,8 @@ impl PrefetchApi {
                         // hit is small.
                         let prefetcher_trie =
                             Trie::new(Arc::new(prefetcher_storage.clone()), trie_root, None);
-                        let storage_key = trie_key.to_vec();
                         metric_prefetch_sent.inc();
-                        match prefetcher_trie.get(&storage_key) {
+                        match prefetcher_trie.get(&trie_key) {
                             Ok(_maybe_value) => {
                                 near_o11y::io_trace!(count: "prefetch");
                             }
