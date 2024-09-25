@@ -1920,6 +1920,7 @@ impl Chain {
                 new_shard_uid.shard_id(),
                 Some(partial_storage),
                 CryptoHash::default(),
+                None,  // contract_changes
             );
             chain_store_update.commit()?;
 

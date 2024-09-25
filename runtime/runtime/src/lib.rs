@@ -20,6 +20,7 @@ pub use near_primitives;
 use near_primitives::account::Account;
 use near_primitives::checked_feature;
 use near_primitives::congestion_info::{BlockCongestionInfo, CongestionInfo};
+use near_primitives::contract_distribution::ContractChanges;
 use near_primitives::errors::{
     ActionError, ActionErrorKind, IntegerOverflowError, InvalidTxError, RuntimeError,
     TxExecutionError,
@@ -188,6 +189,7 @@ pub struct ApplyResult {
     pub delayed_receipts_count: u64,
     pub metrics: Option<metrics::ApplyMetrics>,
     pub congestion_info: Option<CongestionInfo>,
+    pub contract_changes: Option<ContractChanges>,
 }
 
 #[derive(Debug)]
@@ -2047,6 +2049,7 @@ impl Runtime {
         metrics::CHUNK_RECORDED_SIZE_UPPER_BOUND
             .with_label_values(&[shard_id_str.as_str()])
             .observe(chunk_recorded_size_upper_bound);
+        let contract_changes = Some(state_update.contract_storage.get_contract_changes());
         let (trie, trie_changes, state_changes) = state_update.finalize()?;
 
         if let Some(prefetcher) = &processing_state.prefetcher {
@@ -2102,6 +2105,7 @@ impl Runtime {
             delayed_receipts_count,
             metrics: Some(processing_state.metrics),
             congestion_info: own_congestion_info,
+            contract_changes,
         })
     }
 }
@@ -2214,6 +2218,7 @@ fn missing_chunk_apply_result(
         delayed_receipts_count: delayed_receipts.len(),
         metrics: None,
         congestion_info,
+        Some(ContractChanges::default()),
     });
 }
 

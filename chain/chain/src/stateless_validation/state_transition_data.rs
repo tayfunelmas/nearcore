@@ -211,6 +211,7 @@ mod tests {
                 &StoredChunkStateTransitionData {
                     base_state: Default::default(),
                     receipts_hash: Default::default(),
+                    contract_changes: None,
                 },
             )
             .unwrap();

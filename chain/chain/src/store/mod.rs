@@ -10,6 +10,7 @@ use near_chain_primitives::error::Error;
 use near_epoch_manager::EpochManagerAdapter;
 use near_primitives::block::Tip;
 use near_primitives::checked_feature;
+use near_primitives::contract_distribution::ContractChanges;
 use near_primitives::errors::InvalidTxError;
 use near_primitives::hash::CryptoHash;
 use near_primitives::merkle::{MerklePath, PartialMerkleTree};
@@ -2008,6 +2009,7 @@ impl<'a> ChainStoreUpdate<'a> {
         shard_id: ShardId,
         partial_storage: Option<PartialStorage>,
         applied_receipts_hash: CryptoHash,
+        contract_changes: Option<ContractChanges>,
     ) {
         if let Some(partial_storage) = partial_storage {
             self.state_transition_data.insert(
@@ -2015,6 +2017,7 @@ impl<'a> ChainStoreUpdate<'a> {
                 StoredChunkStateTransitionData {
                     base_state: partial_storage.nodes,
                     receipts_hash: applied_receipts_hash,
+                    contract_changes,
                 },
             );
         }

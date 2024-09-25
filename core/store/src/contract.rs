@@ -124,4 +124,8 @@ impl ContractStorage {
     pub fn delete(&self, code_hash: &CodeHash) {
         self.uncommitted_changes.record_delete(code_hash);
     }
+
+    pub fn get_contract_changes(&self) -> ContractChanges {
+        self.uncommitted_changes.changes()
+    }
 }

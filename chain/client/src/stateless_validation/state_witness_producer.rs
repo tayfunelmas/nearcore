@@ -152,7 +152,7 @@ impl Client {
         let (base_state, receipts_hash) = if prev_chunk_header.is_genesis() {
             (Default::default(), hash(&borsh::to_vec::<[Receipt]>(&[]).unwrap()))
         } else {
-            let StoredChunkStateTransitionData { base_state, receipts_hash } = store
+            let StoredChunkStateTransitionData { base_state, receipts_hash , ..} = store
                 .get_ser(
                     near_store::DBCol::StateTransitionData,
                     &near_primitives::utils::get_block_shard_id(main_block, shard_id),
