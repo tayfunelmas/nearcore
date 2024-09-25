@@ -172,6 +172,7 @@ pub enum ProtocolFeature {
     ChunkEndorsementsInBlockHeader,
     /// Store receipts in State in the StateStoredReceipt format.
     StateStoredReceipt,
+    ExcludeContractCodeFromStateWitness,
 }
 
 impl ProtocolFeature {
@@ -247,7 +248,9 @@ impl ProtocolFeature {
             ProtocolFeature::NonrefundableStorage => 140,
             // TODO(#11201): When stabilizing this feature in mainnet, also remove the temporary code
             // that always enables this for mocknet (see config_mocknet function).
-            ProtocolFeature::ShuffleShardAssignments => 143,
+            ProtocolFeature::ExcludeContractCodeFromStateWitness
+            | ProtocolFeature::ShuffleShardAssignments => 143,
+            
         }
     }
 

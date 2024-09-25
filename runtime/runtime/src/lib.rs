@@ -2218,7 +2218,7 @@ fn missing_chunk_apply_result(
         delayed_receipts_count: delayed_receipts.len(),
         metrics: None,
         congestion_info,
-        Some(ContractChanges::default()),
+        contract_changes: Some(ContractChanges::default()),
     });
 }
 
