@@ -1296,6 +1296,7 @@ impl RuntimeAdapter for KeyValueRuntime {
             processed_yield_timeouts: vec![],
             applied_receipts_hash: hash(&borsh::to_vec(receipts).unwrap()),
             congestion_info: Self::get_congestion_info(PROTOCOL_VERSION),
+            // TODO(#11099): Check protocol version for this.
             contract_changes: Some(ContractChanges::default()),
         })
     }

@@ -212,6 +212,7 @@ mod tests {
                 &StoredChunkStateTransitionData {
                     base_state: Default::default(),
                     receipts_hash: Default::default(),
+                    // TODO(#11099): Check protocol version for this.
                     contract_changes: Some(ContractChanges::default()),
                 },
             )

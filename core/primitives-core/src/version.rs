@@ -250,7 +250,6 @@ impl ProtocolFeature {
             // that always enables this for mocknet (see config_mocknet function).
             ProtocolFeature::ExcludeContractCodeFromStateWitness
             | ProtocolFeature::ShuffleShardAssignments => 143,
-            
         }
     }
 

@@ -63,6 +63,7 @@ impl ContractChangesTracker {
         None
     }
 
+    // TODO(#11099): Implement into() operation.
     fn changes(&self) -> ContractChanges {
         let mut changes = ContractChanges::default();
         let guard = self.changes.read().expect("no panics");
@@ -98,6 +99,7 @@ pub struct ContractStorage {
     /// The State this field should be removed, and the `Storage::store` function should be
     /// adjusted to write out the contract into the relevant part of the database immediately
     /// (without going through transactional storage operations and such).
+    /// TODO(#11099): Move Arc<> to here.
     uncommitted_changes: ContractChangesTracker,
 }
 
