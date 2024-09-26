@@ -296,6 +296,12 @@ pub enum NetworkRequests {
     ContractChanges(Vec<AccountId>, SignedEncodedContractChanges),
 }
 
+#[derive(Debug, actix::Message, strum::IntoStaticStr)]
+#[rtype(result = "()")]
+pub enum StateSyncEvent {
+    StatePartReceived(ShardId, u64),
+}
+
 /// Combines peer address info, chain.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct FullPeerInfo {
@@ -407,6 +413,7 @@ pub struct PeerManagerAdapter {
     pub async_request_sender: AsyncSender<PeerManagerMessageRequest, PeerManagerMessageResponse>,
     pub request_sender: Sender<PeerManagerMessageRequest>,
     pub set_chain_info_sender: Sender<SetChainInfo>,
+    pub state_sync_event_sender: Sender<StateSyncEvent>,
 }
 
 #[cfg(test)]
