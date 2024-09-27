@@ -238,7 +238,8 @@ fn create_external_connection(
 fn validate_state_part(state_root: &StateRoot, part_id: PartId, part: &[u8]) -> bool {
     match BorshDeserialize::try_from_slice(part) {
         Ok(trie_nodes) => {
-            match Trie::validate_state_part(state_root, part_id, trie_nodes) {
+            // TODO(#11099): This is the only place contract storage is not used when creating a trie. Fix this.
+            match Trie::validate_state_part(state_root, part_id, trie_nodes, None) {
                 Ok(_) => true,
                 // Storage error should not happen
                 Err(err) => {

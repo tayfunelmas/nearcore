@@ -30,6 +30,8 @@ use near_primitives::types::{
 };
 use near_primitives::utils::create_receipt_id_from_transaction;
 use near_primitives::version::{ProtocolFeature, PROTOCOL_VERSION};
+use near_store::adapter::StoreAdapter;
+use near_store::contract::ContractStorage;
 use near_store::test_utils::TestTriesBuilder;
 use near_store::trie::receipts_column_helper::ShardsOutgoingReceiptBuffer;
 use near_store::{get_account, set_access_key, set_account, ShardTries, Trie};
@@ -1151,7 +1153,9 @@ fn test_main_storage_proof_size_soft_limit() {
     // Check that alice contract is present in storage proof and bob
     // contract is not.
     let partial_storage = apply_result.proof.unwrap();
-    let storage = Trie::from_recorded_storage(partial_storage, root, false);
+    let contract_storage = ContractStorage::new(tries.store().contract_store());
+    let storage =
+        Trie::from_recorded_storage(partial_storage, Some(Arc::new(contract_storage)), root, false);
     let code_key = TrieKey::ContractCode { account_id: alice_account() };
     assert_matches!(storage.get(&code_key), Ok(Some(_)));
     let code_key = TrieKey::ContractCode { account_id: bob_account() };

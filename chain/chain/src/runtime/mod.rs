@@ -39,6 +39,7 @@ use near_primitives::views::{
 };
 use near_store::adapter::{StoreAdapter, StoreUpdateAdapter};
 use near_store::config::StateSnapshotType;
+use near_store::contract::ContractStorage;
 use near_store::flat::FlatStorageManager;
 use near_store::metadata::DbKind;
 use near_store::{
@@ -758,11 +759,15 @@ impl RuntimeAdapter for NightshadeRuntime {
                 trie.dont_charge_gas_for_trie_node_access();
                 trie
             }
-            StorageDataSource::Recorded(storage) => Trie::from_recorded_storage(
-                storage,
-                storage_config.state_root,
-                storage_config.use_flat_storage,
-            ),
+            StorageDataSource::Recorded(partial_storage) => {
+                let contract_storage = ContractStorage::new(self.store().contract_store());
+                Trie::from_recorded_storage(
+                    partial_storage,
+                    Some(Arc::new(contract_storage)),
+                    storage_config.state_root,
+                    storage_config.use_flat_storage,
+                )
+            }
         };
         // StateWitnessSizeLimit: We need to start recording reads if the stateless validation is
         // enabled in the next epoch. We need to save the state transition data in the current epoch
@@ -985,11 +990,15 @@ impl RuntimeAdapter for NightshadeRuntime {
                 trie.dont_charge_gas_for_trie_node_access();
                 trie
             }
-            StorageDataSource::Recorded(storage) => Trie::from_recorded_storage(
-                storage,
-                storage_config.state_root,
-                storage_config.use_flat_storage,
-            ),
+            StorageDataSource::Recorded(partial_storage) => {
+                let contract_storage = ContractStorage::new(self.store().contract_store());
+                Trie::from_recorded_storage(
+                    partial_storage,
+                    Some(Arc::new(contract_storage)),
+                    storage_config.state_root,
+                    storage_config.use_flat_storage,
+                )
+            }
         };
         let next_epoch_id =
             self.epoch_manager.get_next_epoch_id_from_prev_block(&block.prev_block_hash)?;
@@ -1206,7 +1215,13 @@ impl RuntimeAdapter for NightshadeRuntime {
     fn validate_state_part(&self, state_root: &StateRoot, part_id: PartId, data: &[u8]) -> bool {
         match BorshDeserialize::try_from_slice(data) {
             Ok(trie_nodes) => {
-                match Trie::validate_state_part(state_root, part_id, trie_nodes) {
+                let contract_storage = ContractStorage::new(self.store().contract_store());
+                match Trie::validate_state_part(
+                    state_root,
+                    part_id,
+                    trie_nodes,
+                    Some(Arc::new(contract_storage)),
+                ) {
                     Ok(_) => true,
                     // Storage error should not happen
                     Err(err) => {
@@ -1237,8 +1252,9 @@ impl RuntimeAdapter for NightshadeRuntime {
 
         let part = BorshDeserialize::try_from_slice(data)
             .expect("Part was already validated earlier, so could never fail here");
+        let contract_storage = ContractStorage::new(self.store().contract_store());
         let ApplyStatePartResult { trie_changes, flat_state_delta, contract_codes } =
-            Trie::apply_state_part(state_root, part_id, part);
+            Trie::apply_state_part(state_root, part_id, part, Arc::new(contract_storage));
         let tries = self.get_tries();
         let shard_uid = self.get_shard_uid_from_epoch_id(shard_id, epoch_id)?;
         let mut store_update = tries.store_update();

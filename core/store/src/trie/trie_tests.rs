@@ -211,6 +211,7 @@ mod trie_storage_tests {
     use super::*;
     use crate::adapter::trie_store::TrieStoreAdapter;
     use crate::adapter::StoreAdapter;
+    use crate::contract::ContractStorage;
     use crate::test_utils::create_test_store;
     use crate::trie::accounting_cache::TrieAccountingCache;
     use crate::trie::trie_storage::{TrieCache, TrieCachingStorage, TrieDBStorage};
@@ -531,9 +532,15 @@ mod trie_storage_tests {
 
         assert_eq!(disk_iter_recorded, memtrie_iter_recorded);
 
+        let contract_storage = ContractStorage::new(tries.store().contract_store());
         let partial_recorded = {
-            let trie = Trie::from_recorded_storage(memtrie_iter_recorded, state_root, true)
-                .recording_reads();
+            let trie = Trie::from_recorded_storage(
+                memtrie_iter_recorded,
+                Some(Arc::new(contract_storage)),
+                state_root,
+                true,
+            )
+            .recording_reads();
             let mut disk_iter = trie.disk_iter().unwrap();
             disk_iter.seek_prefix(&iter_prefix).unwrap();
             let disk_iter_results = disk_iter.collect::<Result<Vec<_>, _>>().unwrap();

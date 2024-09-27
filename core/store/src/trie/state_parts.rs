@@ -23,7 +23,7 @@ use crate::trie::trie_storage::TrieMemoryPartialStorage;
 use crate::trie::{
     ApplyStatePartResult, NodeHandle, RawTrieNodeWithSize, TrieNode, TrieNodeWithSize,
 };
-use crate::{metrics, PartialStorage, StorageError, Trie, TrieChanges};
+use crate::{metrics, PartialStorage, StorageError, Trie, TrieChanges, TrieStorage};
 use borsh::BorshDeserialize;
 use near_primitives::challenge::PartialState;
 use near_primitives::hash::{hash, CryptoHash};
@@ -428,11 +428,13 @@ impl Trie {
         state_root: &StateRoot,
         part_id: PartId,
         partial_state: PartialState,
+        contract_storage: Option<Arc<dyn TrieStorage>>,
     ) -> Result<(), StorageError> {
         let PartialState::TrieValues(nodes) = &partial_state;
         let num_nodes = nodes.len();
         let trie = Trie::from_recorded_storage(
             PartialStorage { nodes: partial_state },
+            contract_storage,
             *state_root,
             false,
         );
@@ -452,6 +454,7 @@ impl Trie {
         state_root: &StateRoot,
         part_id: PartId,
         part: PartialState,
+        contract_storage: Arc<dyn TrieStorage>,
     ) -> Result<ApplyStatePartResult, StorageError> {
         if state_root == &Trie::EMPTY_ROOT {
             return Ok(ApplyStatePartResult {
@@ -460,7 +463,12 @@ impl Trie {
                 contract_codes: vec![],
             });
         }
-        let trie = Trie::from_recorded_storage(PartialStorage { nodes: part }, *state_root, false);
+        let trie = Trie::from_recorded_storage(
+            PartialStorage { nodes: part },
+            Some(contract_storage),
+            *state_root,
+            false,
+        );
         let path_begin = trie.find_state_part_boundary(part_id.idx, part_id.total)?;
         let path_end = trie.find_state_part_boundary(part_id.idx + 1, part_id.total)?;
         let mut iterator = trie.disk_iter()?;
@@ -499,8 +507,9 @@ impl Trie {
         state_root: &StateRoot,
         part_id: PartId,
         part: PartialState,
+        contract_storage: Arc<dyn TrieStorage>,
     ) -> ApplyStatePartResult {
-        Self::apply_state_part_impl(state_root, part_id, part)
+        Self::apply_state_part_impl(state_root, part_id, part, contract_storage)
             .expect("apply_state_part is guaranteed to succeed when each part is valid")
     }
 
@@ -525,8 +534,9 @@ mod tests {
 
     use near_primitives::hash::{hash, CryptoHash};
 
-    use crate::adapter::StoreUpdateAdapter;
-    use crate::test_utils::{gen_changes, test_populate_trie, TestTriesBuilder};
+    use crate::adapter::{StoreAdapter, StoreUpdateAdapter};
+    use crate::contract::ContractStorage;
+    use crate::test_utils::{create_test_store, gen_changes, test_populate_trie, TestTriesBuilder};
     use crate::trie::iterator::CrumbStatus;
     use crate::trie::{
         TrieRefcountAddition, TrieRefcountDeltaMap, TrieRefcountSubtraction, ValueHandle,
@@ -620,6 +630,7 @@ mod tests {
         pub fn combine_state_parts_naive(
             state_root: &StateRoot,
             parts: &[PartialState],
+            contract_storage: Arc<dyn TrieStorage>,
         ) -> Result<TrieChanges, StorageError> {
             let nodes = PartialState::TrieValues(
                 parts
@@ -628,7 +639,12 @@ mod tests {
                     .cloned()
                     .collect(),
             );
-            let trie = Trie::from_recorded_storage(PartialStorage { nodes }, *state_root, false);
+            let trie = Trie::from_recorded_storage(
+                PartialStorage { nodes },
+                Some(contract_storage),
+                *state_root,
+                false,
+            );
             let mut insertions = <HashMap<CryptoHash, (Vec<u8>, u32)>>::new();
             trie.traverse_all_nodes(|hash| {
                 if let Some((_bytes, rc)) = insertions.get_mut(hash) {
@@ -736,17 +752,22 @@ mod tests {
     #[test]
     fn test_combine_empty_trie_parts() {
         let state_root = Trie::EMPTY_ROOT;
-        let _ = Trie::combine_state_parts_naive(&state_root, &[]).unwrap();
+        let store = create_test_store();
+        let contract_storage = Arc::new(ContractStorage::new(store.contract_store()));
+        let _ =
+            Trie::combine_state_parts_naive(&state_root, &[], contract_storage.clone()).unwrap();
         let _ = Trie::validate_state_part(
             &state_root,
             PartId::new(0, 1),
             PartialState::TrieValues(vec![]),
+            Some(contract_storage.clone()),
         )
         .unwrap();
         let _ = Trie::apply_state_part(
             &state_root,
             PartId::new(0, 1),
             PartialState::TrieValues(vec![]),
+            contract_storage,
         );
     }
 
@@ -943,7 +964,12 @@ mod tests {
                     })
                     .collect::<Vec<_>>();
 
-                let trie_changes = check_combine_state_parts(trie.get_root(), num_parts, &parts);
+                let trie_changes = check_combine_state_parts(
+                    trie.get_root(),
+                    num_parts,
+                    &parts,
+                    trie.contract_storage.clone(),
+                );
 
                 let mut nodes = <HashMap<CryptoHash, Arc<[u8]>>>::new();
                 let sizes_vec = parts
@@ -968,6 +994,7 @@ mod tests {
                         trie.get_root(),
                         PartId::new(0, 1),
                         PartialState::TrieValues(all_nodes),
+                        Some(trie.contract_storage.clone()),
                     ),
                     Ok(())
                 );
@@ -1013,8 +1040,10 @@ mod tests {
         state_root: &CryptoHash,
         num_parts: u64,
         parts: &[PartialState],
+        contract_storage: Arc<dyn TrieStorage>,
     ) -> TrieChanges {
-        let trie_changes = Trie::combine_state_parts_naive(state_root, parts).unwrap();
+        let trie_changes =
+            Trie::combine_state_parts_naive(state_root, parts, contract_storage.clone()).unwrap();
 
         let trie_changes_new = {
             let changes = (0..num_parts)
@@ -1023,6 +1052,7 @@ mod tests {
                         state_root,
                         PartId::new(part_id, num_parts),
                         parts[part_id as usize].clone(),
+                        contract_storage.clone(),
                     )
                     .trie_changes
                 })
@@ -1076,7 +1106,15 @@ mod tests {
             let mut trie_values_shuffled = trie_values.clone();
             trie_values_shuffled.shuffle(&mut rng);
             let state_part = PartialState::TrieValues(trie_values_shuffled);
-            assert_eq!(Trie::validate_state_part(&root, part_id, state_part), Ok(()));
+            assert_eq!(
+                Trie::validate_state_part(
+                    &root,
+                    part_id,
+                    state_part,
+                    Some(trie.contract_storage.clone())
+                ),
+                Ok(())
+            );
         }
 
         // Remove middle element from state part, check that validation fails.
@@ -1085,7 +1123,12 @@ mod tests {
         let wrong_state_part = PartialState::TrieValues(trie_values_missing);
 
         assert_matches!(
-            Trie::validate_state_part(&root, part_id, wrong_state_part),
+            Trie::validate_state_part(
+                &root,
+                part_id,
+                wrong_state_part,
+                Some(trie.contract_storage.clone())
+            ),
             Err(StorageError::MissingTrieValue(
                 MissingTrieValueContext::TrieMemoryPartialStorage,
                 _
@@ -1097,7 +1140,12 @@ mod tests {
         trie_values_extra.push(vec![11].into());
         let wrong_state_part = PartialState::TrieValues(trie_values_extra);
         assert_eq!(
-            Trie::validate_state_part(&root, part_id, wrong_state_part),
+            Trie::validate_state_part(
+                &root,
+                part_id,
+                wrong_state_part,
+                Some(trie.contract_storage.clone())
+            ),
             Err(StorageError::UnexpectedTrieValue)
         );
 
@@ -1108,7 +1156,12 @@ mod tests {
             .push(trie_values_extra_same[trie_values_extra_same.len() / 2].clone());
         let wrong_state_part = PartialState::TrieValues(trie_values_extra_same);
         assert_eq!(
-            Trie::validate_state_part(&root, part_id, wrong_state_part),
+            Trie::validate_state_part(
+                &root,
+                part_id,
+                wrong_state_part,
+                Some(trie.contract_storage.clone())
+            ),
             Err(StorageError::UnexpectedTrieValue)
         );
     }
@@ -1142,6 +1195,7 @@ mod tests {
                         trie.get_root(),
                         PartId::new(part_id, num_parts),
                         trie_nodes,
+                        Some(trie.contract_storage.clone()),
                     ),
                     Ok(())
                 );
@@ -1183,7 +1237,15 @@ mod tests {
         let state_part = trie_without_flat
             .get_trie_nodes_for_part_without_flat_storage(part_id)
             .expect("State part generation using Trie must work");
-        assert_eq!(Trie::validate_state_part(&root, part_id, state_part.clone()), Ok(()));
+        assert_eq!(
+            Trie::validate_state_part(
+                &root,
+                part_id,
+                state_part.clone(),
+                Some(trie.contract_storage.clone())
+            ),
+            Ok(())
+        );
         assert!(state_part.len() > 0);
 
         // Check that if we try to use flat storage but it is empty, state part

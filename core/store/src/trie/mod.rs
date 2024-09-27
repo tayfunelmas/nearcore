@@ -4,6 +4,7 @@ use self::mem::flexible_data::value::ValueView;
 use self::mem::updating::{UpdatedMemTrieNode, UpdatedMemTrieNodeId};
 use self::trie_recording::TrieRecorder;
 use self::trie_storage::TrieMemoryPartialStorage;
+use crate::adapter::StoreAdapter;
 use crate::flat::{FlatStateChanges, FlatStorageChunkView};
 pub use crate::trie::config::TrieConfig;
 pub(crate) use crate::trie::config::{
@@ -745,14 +746,14 @@ impl Trie {
     /// same costs as if flat storage were present.
     pub fn from_recorded_storage(
         partial_storage: PartialStorage,
+        contract_storage: Option<Arc<dyn TrieStorage>>,
         root: StateRoot,
         flat_storage_used: bool,
     ) -> Self {
         let PartialState::TrieValues(nodes) = partial_storage.nodes;
         let recorded_storage = nodes.into_iter().map(|value| (hash(&value), value)).collect();
         let trie_storage = Arc::new(TrieMemoryPartialStorage::new(recorded_storage));
-        // TODO(#11099): Take contract storage from the caller, this is a hack!
-        let contract_storage = trie_storage.clone();
+        let contract_storage = contract_storage.unwrap_or_else(|| trie_storage.clone());
         let mut trie = Self::new(trie_storage, contract_storage, root, None);
         trie.charge_gas_for_trie_node_access = !flat_storage_used;
         trie
@@ -1836,6 +1837,7 @@ mod tests {
     use assert_matches::assert_matches;
     use rand::Rng;
 
+    use crate::contract::ContractStorage;
     use crate::test_utils::{
         create_test_store, gen_changes, simplify_changes, test_populate_flat_storage,
         test_populate_trie, TestTriesBuilder,
@@ -2208,8 +2210,14 @@ mod tests {
         trie2.get_impl(b"dog", false).unwrap();
         trie2.get_impl(b"horse", false).unwrap();
         let partial_storage = trie2.recorded_storage();
+        let contract_storage = ContractStorage::new(tries.store().contract_store());
 
-        let trie3 = Trie::from_recorded_storage(partial_storage.unwrap(), root, false);
+        let trie3 = Trie::from_recorded_storage(
+            partial_storage.unwrap(),
+            Some(Arc::new(contract_storage)),
+            root,
+            false,
+        );
 
         assert_eq!(trie3.get_impl(b"dog", false), Ok(Some(b"puppy".to_vec())));
         assert_eq!(trie3.get_impl(b"horse", false), Ok(Some(b"stallion".to_vec())));

@@ -16,7 +16,9 @@ use near_primitives::state_record::StateRecord;
 use near_primitives::types::{EpochId, StateRoot};
 use near_primitives_core::hash::CryptoHash;
 use near_primitives_core::types::{BlockHeight, EpochHeight, ShardId};
-use near_store::{PartialStorage, Store, Trie};
+use near_store::adapter::StoreAdapter;
+use near_store::contract::ContractStorage;
+use near_store::{PartialStorage, Store, Trie, TrieStorage};
 use near_time::Clock;
 use nearcore::{NearConfig, NightshadeRuntime, NightshadeRuntimeExt};
 use std::ops::Range;
@@ -101,6 +103,7 @@ impl StatePartsSubCommand {
         near_config: NearConfig,
         store: Store,
     ) {
+        let contract_storage = ContractStorage::new(store.contract_store());
         let epoch_manager =
             EpochManager::new_arc_handle(store.clone(), &near_config.genesis.config);
         let shard_tracker = ShardTracker::new(
@@ -155,6 +158,7 @@ impl StatePartsSubCommand {
                         chain_id,
                         store,
                         &external,
+                        Arc::new(contract_storage),
                     )
                     .await
                 }
@@ -183,6 +187,7 @@ impl StatePartsSubCommand {
                         chain_id,
                         store,
                         &external,
+                        Arc::new(contract_storage),
                     )
                     .await
                 }
@@ -328,6 +333,7 @@ async fn load_state_parts(
     chain_id: &str,
     store: Store,
     external: &ExternalConnection,
+    contract_storage: Arc<dyn TrieStorage>,
 ) {
     let epoch_id = epoch_selection.to_epoch_id(store, chain);
     let (state_root, epoch_height, epoch_id, sync_hash) =
@@ -403,18 +409,30 @@ async fn load_state_parts(
                 ));
                 tracing::info!(target: "state-parts", part_id, part_length = part.len(), elapsed_sec = timer.elapsed().as_secs_f64(), "Validated a state part");
             }
-            LoadAction::Print => {
-                print_state_part(&state_root, PartId::new(part_id, num_parts), &part)
-            }
+            LoadAction::Print => print_state_part(
+                &state_root,
+                PartId::new(part_id, num_parts),
+                &part,
+                contract_storage.clone(),
+            ),
         }
     }
     tracing::info!(target: "state-parts", total_elapsed_sec = timer.elapsed().as_secs_f64(), "Loaded all requested state parts");
 }
 
-fn print_state_part(state_root: &StateRoot, _part_id: PartId, data: &[u8]) {
+fn print_state_part(
+    state_root: &StateRoot,
+    _part_id: PartId,
+    data: &[u8],
+    contract_storage: Arc<dyn TrieStorage>,
+) {
     let trie_nodes: PartialState = BorshDeserialize::try_from_slice(data).unwrap();
-    let trie =
-        Trie::from_recorded_storage(PartialStorage { nodes: trie_nodes }, *state_root, false);
+    let trie = Trie::from_recorded_storage(
+        PartialStorage { nodes: trie_nodes },
+        Some(contract_storage),
+        *state_root,
+        false,
+    );
     trie.print_recursive(
         &mut std::io::stdout().lock(),
         &state_root,
@@ -436,6 +454,7 @@ async fn dump_state_parts(
     chain_id: &str,
     store: Store,
     external: &ExternalConnection,
+    contract_storage: Arc<dyn TrieStorage>,
 ) {
     let epoch_id = epoch_selection.to_epoch_id(store, chain);
     let epoch = chain.epoch_manager.get_epoch_info(&epoch_id).unwrap();
@@ -505,7 +524,8 @@ async fn dump_state_parts(
         external.put_file(file_type, &state_part, shard_id, &location).await.unwrap();
         // part_storage.write(&state_part, part_id, num_parts);
         let elapsed_sec = timer.elapsed().as_secs_f64();
-        let first_state_record = get_first_state_record(&state_root, &state_part);
+        let first_state_record =
+            get_first_state_record(&state_root, &state_part, contract_storage.clone());
         tracing::info!(
             target: "state-parts",
             part_id,
@@ -518,10 +538,18 @@ async fn dump_state_parts(
 }
 
 /// Returns the first `StateRecord` encountered while iterating over a sub-trie in the state part.
-fn get_first_state_record(state_root: &StateRoot, data: &[u8]) -> Option<StateRecord> {
+fn get_first_state_record(
+    state_root: &StateRoot,
+    data: &[u8],
+    contract_storage: Arc<dyn TrieStorage>,
+) -> Option<StateRecord> {
     let trie_nodes = BorshDeserialize::try_from_slice(data).unwrap();
-    let trie =
-        Trie::from_recorded_storage(PartialStorage { nodes: trie_nodes }, *state_root, false);
+    let trie = Trie::from_recorded_storage(
+        PartialStorage { nodes: trie_nodes },
+        Some(contract_storage),
+        *state_root,
+        false,
+    );
 
     for (key, value) in trie.disk_iter().unwrap().flatten() {
         if let Some(sr) = StateRecord::from_raw_key_value(key, value) {

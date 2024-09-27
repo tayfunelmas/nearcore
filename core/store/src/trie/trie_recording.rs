@@ -598,8 +598,12 @@ mod trie_recording_tests {
                 partial_storage.nodes.len(),
                 data_in_trie.len()
             );
-            let trie =
-                Trie::from_recorded_storage(partial_storage.clone(), state_root, use_flat_storage);
+            let trie = Trie::from_recorded_storage(
+                partial_storage.clone(),
+                Some(trie.contract_storage.clone()),
+                state_root,
+                use_flat_storage,
+            );
             trie.accounting_cache.borrow().enable_switch().set(enable_accounting_cache);
             for key in &keys_to_get {
                 assert_eq!(trie.get_impl(key, false).unwrap(), data_in_trie.get(key).cloned());
@@ -616,8 +620,13 @@ mod trie_recording_tests {
             trie.update(updates.iter().cloned()).unwrap();
 
             // Build a Trie using recorded storage and enable recording_reads on this Trie
-            let trie = Trie::from_recorded_storage(partial_storage, state_root, use_flat_storage)
-                .recording_reads();
+            let trie = Trie::from_recorded_storage(
+                partial_storage,
+                Some(trie.contract_storage.clone()),
+                state_root,
+                use_flat_storage,
+            )
+            .recording_reads();
             trie.accounting_cache.borrow().enable_switch().set(enable_accounting_cache);
             for key in &keys_to_get {
                 assert_eq!(trie.get_impl(key, false).unwrap(), data_in_trie.get(key).cloned());
