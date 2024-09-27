@@ -16,7 +16,6 @@
 //! Moreover, we include all left siblings for each path, because they are
 //! necessary to prove its position in the list of prefix sums.
 
-use crate::contract::ContractStorage;
 use crate::flat::{FlatStateChanges, FlatStateIterator};
 use crate::trie::iterator::TrieTraversalItem;
 use crate::trie::nibble_slice::NibbleSlice;
@@ -241,12 +240,8 @@ impl Trie {
         let local_trie_creation_timer = metrics::GET_STATE_PART_CREATE_TRIE_ELAPSED
             .with_label_values(&[&shard_id.to_string()])
             .start_timer();
-        let local_state_part_trie = Trie::new(
-            Arc::new(TrieMemoryPartialStorage::default()),
-            state_trie.contract_storage().clone(),
-            StateRoot::new(),
-            None,
-        );
+        let local_state_part_trie =
+            Trie::new(Arc::new(TrieMemoryPartialStorage::default()), StateRoot::new(), None);
         let local_state_part_nodes =
             local_state_part_trie.update(all_state_part_items.into_iter())?.insertions;
         let local_trie_creation_duration = local_trie_creation_timer.stop_and_record();
@@ -266,12 +261,8 @@ impl Trie {
                 .iter()
                 .map(|entry| (*entry.hash(), entry.payload().to_vec().into())),
         );
-        let final_trie = Trie::new(
-            Arc::new(TrieMemoryPartialStorage::new(all_nodes)),
-            self.contract_storage().clone(),
-            self.root,
-            None,
-        );
+        let final_trie =
+            Trie::new(Arc::new(TrieMemoryPartialStorage::new(all_nodes)), self.root, None);
 
         final_trie.visit_nodes_for_state_part(part_id)?;
         let final_trie_storage = final_trie.storage.as_partial_storage().unwrap();
@@ -429,13 +420,11 @@ impl Trie {
         state_root: &StateRoot,
         part_id: PartId,
         partial_state: PartialState,
-        contract_storage: ContractStorage,
     ) -> Result<(), StorageError> {
         let PartialState::TrieValues(nodes) = &partial_state;
         let num_nodes = nodes.len();
         let trie = Trie::from_recorded_storage(
             PartialStorage { nodes: partial_state },
-            contract_storage,
             *state_root,
             false,
         );
@@ -455,7 +444,6 @@ impl Trie {
         state_root: &StateRoot,
         part_id: PartId,
         part: PartialState,
-        contract_storage: ContractStorage,
     ) -> Result<ApplyStatePartResult, StorageError> {
         if state_root == &Trie::EMPTY_ROOT {
             return Ok(ApplyStatePartResult {
@@ -464,12 +452,7 @@ impl Trie {
                 contract_codes: vec![],
             });
         }
-        let trie = Trie::from_recorded_storage(
-            PartialStorage { nodes: part },
-            contract_storage,
-            *state_root,
-            false,
-        );
+        let trie = Trie::from_recorded_storage(PartialStorage { nodes: part }, *state_root, false);
         let path_begin = trie.find_state_part_boundary(part_id.idx, part_id.total)?;
         let path_end = trie.find_state_part_boundary(part_id.idx + 1, part_id.total)?;
         let mut iterator = trie.disk_iter()?;
@@ -508,9 +491,8 @@ impl Trie {
         state_root: &StateRoot,
         part_id: PartId,
         part: PartialState,
-        contract_storage: ContractStorage,
     ) -> ApplyStatePartResult {
-        Self::apply_state_part_impl(state_root, part_id, part, contract_storage)
+        Self::apply_state_part_impl(state_root, part_id, part)
             .expect("apply_state_part is guaranteed to succeed when each part is valid")
     }
 

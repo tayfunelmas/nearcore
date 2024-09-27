@@ -1,6 +1,5 @@
-use crate::{Store, TrieDBStorage, TrieStorage};
+use crate::TrieStorage;
 use near_primitives::contract_distribution::{ContractChange, ContractChanges};
-use near_primitives::shard_layout::ShardUId;
 use near_primitives::types::CodeHash;
 use near_vm_runner::ContractCode;
 use std::collections::btree_map::Entry;
@@ -100,15 +99,13 @@ pub struct ContractStorage {
     /// The State this field should be removed, and the `Storage::store` function should be
     /// adjusted to write out the contract into the relevant part of the database immediately
     /// (without going through transactional storage operations and such).
+    /// TODO(#11099): Move Arc<> to here.
     uncommitted_changes: ContractChangesTracker,
 }
 
 impl ContractStorage {
-    pub fn new(store: Store, shard_uid: ShardUId) -> Self {
-        Self {
-            storage: Arc::new(TrieDBStorage::new(store, shard_uid)),
-            uncommitted_changes: Default::default(),
-        }
+    pub fn new(storage: Arc<dyn TrieStorage>) -> Self {
+        Self { storage, uncommitted_changes: Default::default() }
     }
 
     pub fn get(&self, code_hash: CodeHash) -> Option<ContractCode> {
