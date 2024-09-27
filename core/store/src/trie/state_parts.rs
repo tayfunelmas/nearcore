@@ -240,8 +240,12 @@ impl Trie {
         let local_trie_creation_timer = metrics::GET_STATE_PART_CREATE_TRIE_ELAPSED
             .with_label_values(&[&shard_id.to_string()])
             .start_timer();
-        let local_state_part_trie =
-            Trie::new(Arc::new(TrieMemoryPartialStorage::default()), StateRoot::new(), None);
+        let local_state_part_trie = Trie::new(
+            Arc::new(TrieMemoryPartialStorage::default()),
+            self.contract_storage.clone(),
+            StateRoot::new(),
+            None,
+        );
         let local_state_part_nodes =
             local_state_part_trie.update(all_state_part_items.into_iter())?.insertions;
         let local_trie_creation_duration = local_trie_creation_timer.stop_and_record();
@@ -261,11 +265,15 @@ impl Trie {
                 .iter()
                 .map(|entry| (*entry.hash(), entry.payload().to_vec().into())),
         );
-        let final_trie =
-            Trie::new(Arc::new(TrieMemoryPartialStorage::new(all_nodes)), self.root, None);
+        let final_trie = Trie::new(
+            Arc::new(TrieMemoryPartialStorage::new(all_nodes)),
+            self.contract_storage.clone(),
+            self.root,
+            None,
+        );
 
         final_trie.visit_nodes_for_state_part(part_id)?;
-        let final_trie_storage = final_trie.storage.as_partial_storage().unwrap();
+        let final_trie_storage = final_trie.trie_storage.as_partial_storage().unwrap();
         let final_state_part_nodes = final_trie_storage.partial_state();
         let PartialState::TrieValues(trie_values) = &final_state_part_nodes;
         let final_part_creation_duration = final_part_creation_timer.stop_and_record();
@@ -430,7 +438,7 @@ impl Trie {
         );
 
         trie.visit_nodes_for_state_part(part_id)?;
-        let storage = trie.storage.as_partial_storage().unwrap();
+        let storage = trie.trie_storage.as_partial_storage().unwrap();
 
         if storage.visited_nodes.read().expect("read visited_nodes").len() != num_nodes {
             // As all nodes belonging to state part were visited, there is some

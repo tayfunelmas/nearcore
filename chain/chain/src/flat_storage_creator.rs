@@ -22,6 +22,7 @@ use near_primitives::state_part::PartId;
 use near_primitives::types::{BlockHeight, StateRoot};
 use near_store::adapter::flat_store::FlatStoreAdapter;
 use near_store::adapter::StoreAdapter;
+use near_store::contract::ContractStorage;
 use near_store::flat::{
     BlockInfo, FetchingStateStatus, FlatStateChanges, FlatStorageCreationMetrics,
     FlatStorageCreationStatus, FlatStorageManager, FlatStorageReadyStatus, FlatStorageStatus,
@@ -97,7 +98,8 @@ impl FlatStorageShardCreator {
         result_sender: Sender<u64>,
     ) {
         let trie_storage = TrieDBStorage::new(store.trie_store(), shard_uid);
-        let trie = Trie::new(Arc::new(trie_storage), state_root, None);
+        let contract_storage = ContractStorage::new(store.contract_store());
+        let trie = Trie::new(Arc::new(trie_storage), Arc::new(contract_storage), state_root, None);
         let path_begin = trie.find_state_part_boundary(part_id.idx, part_id.total).unwrap();
         let path_end = trie.find_state_part_boundary(part_id.idx + 1, part_id.total).unwrap();
         let hex_path_begin = Self::nibbles_to_hex(&path_begin);
@@ -187,9 +189,15 @@ impl FlatStorageShardCreator {
                     let epoch_id = self.epoch_manager.get_epoch_id(&block_hash)?;
                     let shard_uid = self.epoch_manager.shard_id_to_uid(shard_id, &epoch_id)?;
                     let trie_storage = TrieDBStorage::new(store.trie_store(), shard_uid);
+                    let contract_storage = ContractStorage::new(store.contract_store());
                     let state_root =
                         *chain_store.get_chunk_extra(&block_hash, &shard_uid)?.state_root();
-                    let trie = Trie::new(Arc::new(trie_storage), state_root, None);
+                    let trie = Trie::new(
+                        Arc::new(trie_storage),
+                        Arc::new(contract_storage),
+                        state_root,
+                        None,
+                    );
                     let root_node = trie.retrieve_root_node().unwrap();
                     let num_state_parts =
                         root_node.memory_usage / STATE_PART_MEMORY_LIMIT.as_u64() + 1;

@@ -6,6 +6,7 @@ use near_epoch_manager::EpochManager;
 use near_primitives::trie_key::col;
 use near_primitives::types::AccountId;
 use near_store::adapter::StoreAdapter;
+use near_store::contract::ContractStorage;
 use near_store::{ShardUId, Trie, TrieDBStorage};
 use nearcore::{load_config, open_storage};
 use std::collections::BTreeMap;
@@ -101,7 +102,8 @@ impl AnalyzeContractSizesCommand {
 
             let state_root = chunk_extra.state_root();
             let trie_storage = Arc::new(TrieDBStorage::new(store.trie_store(), shard_uid));
-            let trie = Trie::new(trie_storage, *state_root, None);
+            let contract_storage = ContractStorage::new(store.contract_store());
+            let trie = Trie::new(trie_storage, Arc::new(contract_storage), *state_root, None);
 
             let mut iterator = trie.disk_iter().unwrap();
             iterator.seek_prefix(&[col::CONTRACT_CODE]).unwrap();

@@ -1,10 +1,14 @@
-use crate::TrieStorage;
 use near_primitives::contract_distribution::{ContractChange, ContractChanges};
+use near_primitives::errors::StorageError;
+use near_primitives::hash::CryptoHash;
 use near_primitives::types::CodeHash;
 use near_vm_runner::ContractCode;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
+
+use crate::adapter::contract_store::ContractStoreAdapter;
+use crate::TrieStorage;
 
 #[derive(Default)]
 struct ContractCodeWithRefcount {
@@ -24,6 +28,10 @@ pub struct ContractChangesTracker {
 }
 
 impl ContractChangesTracker {
+    fn new() -> Self {
+        Self::default()
+    }
+
     fn record_deploy(&self, code: ContractCode) {
         let mut guard = self.changes.write().expect("no panics");
         let changes = match guard.entry(*code.hash()) {
@@ -84,7 +92,7 @@ impl ContractChangesTracker {
 ///
 /// Cloning is cheap.
 #[derive(Clone)]
-pub struct ContractStorage {
+pub struct ContractStorageUpdate {
     storage: Arc<dyn TrieStorage>,
 
     /// During an apply of a single chunk contracts may be deployed through the
@@ -103,9 +111,16 @@ pub struct ContractStorage {
     uncommitted_changes: ContractChangesTracker,
 }
 
-impl ContractStorage {
-    pub fn new(storage: Arc<dyn TrieStorage>) -> Self {
-        Self { storage, uncommitted_changes: Default::default() }
+impl ContractStorageUpdate {
+    pub fn new(store: ContractStoreAdapter) -> Self {
+        Self {
+            storage: Arc::new(ContractStorage::new(store)),
+            uncommitted_changes: ContractChangesTracker::new(),
+        }
+    }
+
+    pub fn from(storage: Arc<dyn TrieStorage>) -> Self {
+        Self { storage, uncommitted_changes: ContractChangesTracker::new() }
     }
 
     pub fn get(&self, code_hash: CodeHash) -> Option<ContractCode> {
@@ -129,5 +144,25 @@ impl ContractStorage {
 
     pub fn get_contract_changes(&self) -> ContractChanges {
         self.uncommitted_changes.changes()
+    }
+}
+
+/// Reads contract code from the trie by its hash.
+///
+/// Cloning is cheap.
+#[derive(Clone)]
+pub struct ContractStorage {
+    store: ContractStoreAdapter,
+}
+
+impl ContractStorage {
+    pub fn new(store: ContractStoreAdapter) -> Self {
+        Self { store }
+    }
+}
+
+impl TrieStorage for ContractStorage {
+    fn retrieve_raw_bytes(&self, hash: &CryptoHash) -> Result<Arc<[u8]>, StorageError> {
+        self.store.get(hash).map(|code| Arc::from(code.as_slice()))
     }
 }

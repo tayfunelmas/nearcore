@@ -1,4 +1,5 @@
 pub mod chunk_store;
+pub mod contract_store;
 pub mod flat_store;
 pub mod trie_store;
 
@@ -97,6 +98,10 @@ pub trait StoreAdapter {
 
     fn chunk_store(&self) -> chunk_store::ChunkStoreAdapter {
         chunk_store::ChunkStoreAdapter::new(self.store())
+    }
+
+    fn contract_store(&self) -> contract_store::ContractStoreAdapter {
+        contract_store::ContractStoreAdapter::new(self.store())
     }
 }
 

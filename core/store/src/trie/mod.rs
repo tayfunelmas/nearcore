@@ -335,7 +335,8 @@ impl std::fmt::Debug for TrieNode {
 }
 
 pub struct Trie {
-    storage: Arc<dyn TrieStorage>,
+    trie_storage: Arc<dyn TrieStorage>,
+    contract_storage: Arc<dyn TrieStorage>,
     memtries: Option<Arc<RwLock<MemTries>>>,
     root: StateRoot,
     /// If present, flat storage is used to look up keys (if asked for).
@@ -658,20 +659,22 @@ impl Trie {
     /// By default, the accounting cache is not enabled. To enable or disable it
     /// (only in this crate), call self.accounting_cache.borrow_mut().set_enabled().
     pub fn new(
-        storage: Arc<dyn TrieStorage>,
+        trie_storage: Arc<dyn TrieStorage>,
+        contract_storage: Arc<dyn TrieStorage>,
         root: StateRoot,
         flat_storage_chunk_view: Option<FlatStorageChunkView>,
     ) -> Self {
-        Self::new_with_memtries(storage, None, root, flat_storage_chunk_view)
+        Self::new_with_memtries(trie_storage, contract_storage, None, root, flat_storage_chunk_view)
     }
 
     pub fn new_with_memtries(
-        storage: Arc<dyn TrieStorage>,
+        trie_storage: Arc<dyn TrieStorage>,
+        contract_storage: Arc<dyn TrieStorage>,
         memtries: Option<Arc<RwLock<MemTries>>>,
         root: StateRoot,
         flat_storage_chunk_view: Option<FlatStorageChunkView>,
     ) -> Self {
-        let accounting_cache = match storage.as_caching_storage() {
+        let accounting_cache = match trie_storage.as_caching_storage() {
             Some(caching_storage) => RefCell::new(TrieAccountingCache::new(Some((
                 caching_storage.shard_uid,
                 caching_storage.is_view,
@@ -679,7 +682,8 @@ impl Trie {
             None => RefCell::new(TrieAccountingCache::new(None)),
         };
         Trie {
-            storage,
+            trie_storage,
+            contract_storage,
             memtries,
             root,
             charge_gas_for_trie_node_access: flat_storage_chunk_view.is_none(),
@@ -698,7 +702,8 @@ impl Trie {
     /// through that trie accumulates a state proof for all nodes accessed.
     pub fn recording_reads(&self) -> Self {
         let mut trie = Self::new_with_memtries(
-            self.storage.clone(),
+            self.trie_storage.clone(),
+            self.contract_storage.clone(),
             self.memtries.clone(),
             self.root,
             self.flat_storage_chunk_view.clone(),
@@ -745,8 +750,10 @@ impl Trie {
     ) -> Self {
         let PartialState::TrieValues(nodes) = partial_storage.nodes;
         let recorded_storage = nodes.into_iter().map(|value| (hash(&value), value)).collect();
-        let storage = Arc::new(TrieMemoryPartialStorage::new(recorded_storage));
-        let mut trie = Self::new(storage, root, None);
+        let trie_storage = Arc::new(TrieMemoryPartialStorage::new(recorded_storage));
+        // TODO(#11099): Take contract storage from the caller, this is a hack!
+        let contract_storage = trie_storage.clone();
+        let mut trie = Self::new(trie_storage, contract_storage, root, None);
         trie.charge_gas_for_trie_node_access = !flat_storage_used;
         trie
     }
@@ -766,7 +773,7 @@ impl Trie {
     }
 
     pub fn internal_get_storage_as_caching_storage(&self) -> Option<&TrieCachingStorage> {
-        self.storage.as_caching_storage()
+        self.trie_storage.as_caching_storage()
     }
 
     /// Request recording of the code for the given account.
@@ -825,9 +832,9 @@ impl Trie {
         let result = if side_effects && use_accounting_cache {
             self.accounting_cache
                 .borrow_mut()
-                .retrieve_raw_bytes_with_accounting(hash, &*self.storage)?
+                .retrieve_raw_bytes_with_accounting(hash, &*self.trie_storage)?
         } else {
-            self.storage.retrieve_raw_bytes(hash)?
+            self.trie_storage.retrieve_raw_bytes(hash)?
         };
         if side_effects {
             if let Some(recorder) = &self.recorder {
@@ -840,7 +847,7 @@ impl Trie {
     #[cfg(test)]
     fn memory_usage_verify(&self, memory: &NodesStorage, handle: NodeHandle) -> u64 {
         // Cannot compute memory usage naively if given only partial storage.
-        if self.storage.as_partial_storage().is_some() {
+        if self.trie_storage.as_partial_storage().is_some() {
             return 0;
         }
         // We don't want to impact recorded storage by retrieving nodes for
@@ -1664,7 +1671,7 @@ impl Trie {
                     for (value_hash, value) in trie_accesses.values {
                         let value = match value {
                             FlatStateValue::Ref(_) => {
-                                self.storage.retrieve_raw_bytes(&value_hash)?
+                                self.trie_storage.retrieve_raw_bytes(&value_hash)?
                             }
                             FlatStateValue::Inlined(value) => value.into(),
                         };

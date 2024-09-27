@@ -9,6 +9,7 @@ use near_primitives::trie_key::trie_key_parsers::{
 };
 use near_primitives_core::types::ShardId;
 use near_store::adapter::StoreAdapter;
+use near_store::contract::ContractStorage;
 use near_store::{ShardUId, Store, Trie, TrieDBStorage};
 use nearcore::NearConfig;
 use std::cell::RefCell;
@@ -149,9 +150,15 @@ impl TrieIterationBenchmarkCmd {
         // corresponds to the current epoch id. In practice shouldn't
         // matter as the shard layout doesn't change.
         let state_root = chunk_header.prev_state_root();
-        let storage = TrieDBStorage::new(store.trie_store(), shard_uid);
+        let trie_storage = TrieDBStorage::new(store.trie_store(), shard_uid);
+        let contract_storage = ContractStorage::new(store.contract_store());
         let flat_storage_chunk_view = None;
-        Trie::new(Arc::new(storage), state_root, flat_storage_chunk_view)
+        Trie::new(
+            Arc::new(trie_storage),
+            Arc::new(contract_storage),
+            state_root,
+            flat_storage_chunk_view,
+        )
     }
 
     fn iter_trie(&self, trie: &Trie) {

@@ -1,5 +1,7 @@
 use crate::adapter::trie_store::TrieStoreAdapter;
+use crate::adapter::StoreAdapter;
 use crate::config::PrefetchConfig;
+use crate::contract::ContractStorage;
 use crate::sync_utils::Monitor;
 use crate::{metrics, StorageError, Trie, TrieCache, TrieConfig, TrieStorage};
 use crossbeam::select;
@@ -451,6 +453,7 @@ impl PrefetchApi {
             self.shard_cache.clone(),
             self.prefetching.clone(),
         );
+        let contract_storage = ContractStorage::new(self.store.contract_store());
         let work_queue = self.work_queue_rx.clone();
         let metric_prefetch_sent =
             metrics::PREFETCH_SENT.with_label_values(&[&shard_uid.shard_id.to_string()]);
@@ -472,8 +475,12 @@ impl PrefetchApi {
                         // Note that the constructor of `Trie` is trivial, and
                         // the clone only clones a few `Arc`s, so the performance
                         // hit is small.
-                        let prefetcher_trie =
-                            Trie::new(Arc::new(prefetcher_storage.clone()), trie_root, None);
+                        let prefetcher_trie = Trie::new(
+                            Arc::new(prefetcher_storage.clone()),
+                            Arc::new(contract_storage.clone()),
+                            trie_root,
+                            None,
+                        );
                         metric_prefetch_sent.inc();
                         match prefetcher_trie.get(&trie_key) {
                             Ok(_maybe_value) => {

@@ -98,6 +98,8 @@ pub enum MissingTrieValueContext {
     TrieMemoryPartialStorage,
     /// Missing trie value when reading from TrieStorage.
     TrieStorage,
+    /// Missing trie value when reading from ContractStorage
+    ContractStorage,
 }
 
 /// Errors which may occur during working with trie storages, storing

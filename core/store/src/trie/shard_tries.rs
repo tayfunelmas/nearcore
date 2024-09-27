@@ -1,9 +1,9 @@
 use super::mem::mem_tries::MemTries;
 use super::state_snapshot::{StateSnapshot, StateSnapshotConfig};
 use super::TrieRefcountSubtraction;
-use crate::flat::store_helper::remove_all_state_values;
 use crate::adapter::trie_store::{TrieStoreAdapter, TrieStoreUpdateAdapter};
 use crate::adapter::StoreAdapter;
+use crate::contract::ContractStorage;
 use crate::flat::{FlatStorageManager, FlatStorageStatus};
 use crate::trie::config::TrieConfig;
 use crate::trie::mem::loading::load_trie_from_flat_state_and_delta;
@@ -131,7 +131,14 @@ impl ShardTries {
         // Do not use memtries for view queries, for two reasons: memtries do not provide historical state,
         // and also this can introduce lock contention on memtries.
         let memtries = if is_view { None } else { self.get_mem_tries(shard_uid) };
-        Trie::new_with_memtries(storage, memtries, state_root, flat_storage_chunk_view)
+        let contract_storage = ContractStorage::new(self.store().contract_store());
+        Trie::new_with_memtries(
+            storage,
+            Arc::new(contract_storage),
+            memtries,
+            state_root,
+            flat_storage_chunk_view,
+        )
     }
 
     pub fn get_trie_for_shard(&self, shard_uid: ShardUId, state_root: StateRoot) -> Trie {
@@ -148,10 +155,10 @@ impl ShardTries {
         let cache = self
             .get_trie_cache_for(shard_uid, true)
             .expect("trie cache should be enabled for view calls");
-        let storage = Arc::new(TrieCachingStorage::new(store, cache, shard_uid, true, None));
+        let trie_storage = Arc::new(TrieCachingStorage::new(store, cache, shard_uid, true, None));
+        let contract_storage = ContractStorage::new(self.store().contract_store());
         let flat_storage_chunk_view = flat_storage_manager.chunk_view(shard_uid, *block_hash);
-
-        Ok(Trie::new(storage, state_root, flat_storage_chunk_view))
+        Ok(Trie::new(trie_storage, Arc::new(contract_storage), state_root, flat_storage_chunk_view))
     }
 
     pub fn get_trie_with_block_hash_for_shard(

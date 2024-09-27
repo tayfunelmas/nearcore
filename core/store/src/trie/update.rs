@@ -1,7 +1,7 @@
 pub use self::iterator::TrieUpdateIterator;
 use super::accounting_cache::TrieAccountingCacheSwitch;
 use super::{OptimizedValueRef, Trie, TrieWithReadLock};
-use crate::contract::ContractStorage;
+use crate::contract::ContractStorageUpdate;
 use crate::trie::{KeyLookupMode, TrieChanges};
 use crate::StorageError;
 use near_primitives::trie_key::TrieKey;
@@ -26,7 +26,7 @@ pub type TrieUpdates = BTreeMap<Vec<u8>, TrieKeyValueUpdate>;
 /// TODO (#7327): rename to StateUpdate
 pub struct TrieUpdate {
     pub trie: Trie,
-    pub contract_storage: ContractStorage,
+    pub contract_storage: ContractStorageUpdate,
     committed: RawStateChanges,
     prospective: TrieUpdates,
 }
@@ -54,10 +54,10 @@ impl<'a> TrieUpdateValuePtr<'a> {
 
 impl TrieUpdate {
     pub fn new(trie: Trie) -> Self {
-        let trie_storage = trie.storage.clone();
+        let contract_storage = ContractStorageUpdate::from(trie.contract_storage.clone());
         Self {
             trie,
-            contract_storage: ContractStorage::new(trie_storage),
+            contract_storage,
             committed: Default::default(),
             prospective: Default::default(),
         }

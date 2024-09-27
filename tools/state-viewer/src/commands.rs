@@ -42,6 +42,7 @@ use near_primitives::version::PROTOCOL_VERSION;
 use near_primitives_core::types::{Balance, EpochHeight};
 use near_store::adapter::trie_store::TrieStoreAdapter;
 use near_store::adapter::StoreAdapter;
+use near_store::contract::ContractStorage;
 use near_store::flat::FlatStorageChunkView;
 use near_store::flat::FlatStorageManager;
 use near_store::TrieStorage;
@@ -1099,8 +1100,9 @@ fn get_trie(store: TrieStoreAdapter, hash: CryptoHash, shard_id: u32, shard_vers
     let shard_uid = ShardUId { version: shard_version, shard_id };
     let trie_config: TrieConfig = Default::default();
     let shard_cache = TrieCache::new(&trie_config, shard_uid, true);
+    let contract_storage = ContractStorage::new(store.contract_store());
     let trie_storage = TrieCachingStorage::new(store, shard_cache, shard_uid, true, None);
-    Trie::new(Arc::new(trie_storage), hash, None)
+    Trie::new(Arc::new(trie_storage), Arc::new(contract_storage), hash, None)
 }
 
 pub(crate) fn view_trie(
@@ -1177,10 +1179,16 @@ pub(crate) fn contract_accounts(
             &ShardLayout::get_simple_nightshade_layout(),
         );
         // Use simple non-caching storage, we don't expect many duplicate lookups while iterating.
-        let storage = TrieDBStorage::new(store.trie_store(), shard_uid);
+        let trie_storage = TrieDBStorage::new(store.trie_store(), shard_uid);
+        let contract_storage = ContractStorage::new(store.contract_store());
         // We don't need flat state to traverse all accounts.
         let flat_storage_chunk_view = None;
-        Trie::new(Arc::new(storage), state_root, flat_storage_chunk_view)
+        Trie::new(
+            Arc::new(trie_storage),
+            Arc::new(contract_storage),
+            state_root,
+            flat_storage_chunk_view,
+        )
     });
 
     filter.write_header(&mut std::io::stdout().lock())?;

@@ -12,7 +12,7 @@ use near_primitives::config::ViewConfig;
 use near_primitives::hash::CryptoHash;
 use near_primitives::receipt::{Receipt, ReceiptEnum};
 use near_primitives::types::{AccountId, Gas};
-use near_store::contract::ContractStorage;
+use near_store::contract::ContractStorageUpdate;
 use near_vm_runner::logic::{GasCounter, ProtocolVersion};
 use near_vm_runner::{ContractRuntimeCache, PreparedContract};
 use std::collections::{BTreeMap, BTreeSet};
@@ -59,7 +59,7 @@ pub(crate) struct ReceiptPreparationPipeline {
     protocol_version: u32,
 
     /// Storage for WASM code.
-    storage: ContractStorage,
+    storage: ContractStorageUpdate,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -85,7 +85,7 @@ impl ReceiptPreparationPipeline {
         config: Arc<RuntimeConfig>,
         contract_cache: Option<Box<dyn ContractRuntimeCache>>,
         protocol_version: u32,
-        storage: ContractStorage,
+        storage: ContractStorageUpdate,
     ) -> Self {
         Self {
             map: Default::default(),
@@ -319,7 +319,7 @@ impl ReceiptPreparationPipeline {
 }
 
 fn prepare_function_call(
-    contract_storage: &ContractStorage,
+    contract_storage: &ContractStorageUpdate,
     cache: Option<&dyn ContractRuntimeCache>,
 
     protocol_version: ProtocolVersion,
