@@ -138,6 +138,7 @@ impl TrieUpdate {
 
     pub fn rollback(&mut self) {
         self.prospective.clear();
+        self.contract_storage.rollback();
     }
 
     /// Prepare the accumulated state changes to be applied to the underlying storage.

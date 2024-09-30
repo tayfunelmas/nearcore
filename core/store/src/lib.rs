@@ -997,8 +997,21 @@ pub fn get_access_key_raw(
     )
 }
 
+/// Get the contract WASM code from The State.
+///
+/// Executing all the usual storage access side-effects.
+pub fn get_code(
+    trie: &dyn TrieAccess,
+    account_id: &AccountId,
+    code_hash: Option<CryptoHash>,
+) -> Result<Option<ContractCode>, StorageError> {
+    let key = TrieKey::ContractCode { account_id: account_id.clone() };
+    trie.get(&key).map(|opt| opt.map(|code| ContractCode::new(code, code_hash)))
+}
+
 pub fn set_code(state_update: &mut TrieUpdate, account_id: AccountId, code: &ContractCode) {
     state_update.set(TrieKey::ContractCode { account_id }, code.code().to_vec());
+    state_update.contract_storage.store(ContractCode::new(code.code().to_vec(), Some(*code.hash())));
 }
 
 /// Removes account, code and all access keys associated to it.
@@ -1143,18 +1156,6 @@ impl ContractRuntimeCache for StoreContractRuntimeCache {
     fn handle(&self) -> Box<dyn ContractRuntimeCache> {
         Box::new(self.clone())
     }
-}
-
-/// Get the contract WASM code from The State.
-///
-/// Executing all the usual storage access side-effects.
-pub fn get_code(
-    trie: &dyn TrieAccess,
-    account_id: &AccountId,
-    code_hash: Option<CryptoHash>,
-) -> Result<Option<ContractCode>, StorageError> {
-    let key = TrieKey::ContractCode { account_id: account_id.clone() };
-    trie.get(&key).map(|opt| opt.map(|code| ContractCode::new(code, code_hash)))
 }
 
 #[cfg(test)]

@@ -1627,6 +1627,7 @@ impl Trie {
     }
 
     /// Retrieves the full value for the given key.
+    // TODO(#11099): This should be pub(crate) except fopor core/store/benches.
     pub fn get_impl(&self, key: &[u8]) -> Result<Option<Vec<u8>>, StorageError> {
         match self.get_optimized_ref(key, KeyLookupMode::FlatStorage)? {
             Some(optimized_ref) => Ok(Some(self.deref_optimized(&optimized_ref)?)),

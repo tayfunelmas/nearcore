@@ -145,6 +145,10 @@ impl ContractStorageUpdate {
     pub fn get_contract_changes(&self) -> ContractChanges {
         self.uncommitted_changes.changes()
     }
+
+    pub fn rollback(&mut self) {
+        self.uncommitted_changes = ContractChangesTracker::new();
+    }
 }
 
 /// Reads contract code from the trie by its hash.
