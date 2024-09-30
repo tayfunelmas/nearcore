@@ -112,42 +112,33 @@ pub struct ContractStorageUpdate {
 }
 
 impl ContractStorageUpdate {
-    pub fn new(store: ContractStoreAdapter) -> Self {
-        Self {
-            storage: Arc::new(ContractStorage::new(store)),
-            uncommitted_changes: ContractChangesTracker::new(),
-        }
-    }
-
-    pub fn from(storage: Arc<dyn TrieStorage>) -> Self {
+    pub(crate) fn from(storage: Arc<dyn TrieStorage>) -> Self {
         Self { storage, uncommitted_changes: ContractChangesTracker::new() }
     }
 
-    pub fn get(&self, code_hash: CodeHash) -> Option<ContractCode> {
+    pub fn get(&self, code_hash: CodeHash) -> Result<Option<ContractCode>, StorageError> {
         if let Some(v) = self.uncommitted_changes.get(&code_hash) {
-            return Some(ContractCode::new(v.code().to_vec(), Some(code_hash)));
+            return Ok(Some(ContractCode::new(v.code().to_vec(), Some(code_hash))));
         }
-
-        match self.storage.retrieve_raw_bytes(&code_hash) {
-            Ok(raw_code) => Some(ContractCode::new(raw_code.to_vec(), Some(code_hash))),
-            Err(_) => None,
-        }
+        self.storage
+            .retrieve_raw_bytes(&code_hash)
+            .map(|raw_code| Some(ContractCode::new(raw_code.to_vec(), Some(code_hash))))
     }
 
-    pub fn store(&self, code: ContractCode) {
+    pub(crate) fn store(&self, code: ContractCode) {
         self.uncommitted_changes.record_deploy(code);
     }
 
-    pub fn delete(&self, code_hash: &CodeHash) {
+    pub(crate) fn delete(&self, code_hash: &CodeHash) {
         self.uncommitted_changes.record_delete(code_hash);
     }
 
-    pub fn get_contract_changes(&self) -> ContractChanges {
-        self.uncommitted_changes.changes()
+    pub(crate) fn rollback(&mut self) {
+        self.uncommitted_changes = ContractChangesTracker::new();
     }
 
-    pub fn rollback(&mut self) {
-        self.uncommitted_changes = ContractChangesTracker::new();
+    pub(crate) fn get_contract_changes(&self) -> ContractChanges {
+        self.uncommitted_changes.changes()
     }
 }
 

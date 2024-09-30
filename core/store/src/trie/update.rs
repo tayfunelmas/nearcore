@@ -4,6 +4,7 @@ use super::{OptimizedValueRef, Trie, TrieWithReadLock};
 use crate::contract::ContractStorageUpdate;
 use crate::trie::{KeyLookupMode, TrieChanges};
 use crate::StorageError;
+use near_primitives::contract_distribution::ContractChanges;
 use near_primitives::trie_key::TrieKey;
 use near_primitives::types::{
     RawStateChange, RawStateChanges, RawStateChangesWithTrieKey, StateChangeCause, StateRoot,
@@ -139,6 +140,10 @@ impl TrieUpdate {
     pub fn rollback(&mut self) {
         self.prospective.clear();
         self.contract_storage.rollback();
+    }
+
+    pub fn get_contract_changes(&self) -> ContractChanges {
+        self.contract_storage.get_contract_changes()
     }
 
     /// Prepare the accumulated state changes to be applied to the underlying storage.

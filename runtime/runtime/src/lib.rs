@@ -2050,7 +2050,7 @@ impl Runtime {
             .with_label_values(&[shard_id_str.as_str()])
             .observe(chunk_recorded_size_upper_bound);
         // TODO(#11099): Check protocol version for this.
-        let contract_changes = Some(state_update.contract_storage.get_contract_changes());
+        let contract_changes = Some(state_update.get_contract_changes());
         // TODO(#11099): Debugging only, remove this.
         tracing::info!(target: "code-distribution", changes=?contract_changes.as_ref().unwrap().0.len(), "Contract changes into apply-chunk results");
         let (trie, trie_changes, state_changes) = state_update.finalize()?;

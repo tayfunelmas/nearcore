@@ -401,6 +401,9 @@ impl<'a> Contract for RuntimeContractExt<'a> {
                 return Some(wc);
             }
         }
-        self.storage.get(self.code_hash).map(Arc::new)
+        self.storage
+            .get(self.code_hash)
+            .expect("Retrieving contract code must not fail")
+            .map(Arc::new)
     }
 }

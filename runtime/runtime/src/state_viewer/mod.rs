@@ -90,7 +90,7 @@ impl TrieViewer {
         account_id: &AccountId,
     ) -> Result<ContractCode, errors::ViewContractCodeError> {
         let account = self.view_account(state_update, account_id)?;
-        get_code(state_update, account_id, Some(account.code_hash()))?.ok_or_else(|| {
+        get_code(state_update, account_id.clone(), account.code_hash())?.ok_or_else(|| {
             errors::ViewContractCodeError::NoContractCode {
                 contract_account_id: account_id.clone(),
             }
@@ -147,7 +147,7 @@ impl TrieViewer {
     ) -> Result<ViewStateResult, errors::ViewStateError> {
         match get_account(state_update, account_id)? {
             Some(account) => {
-                let code_len = get_code(state_update, account_id, Some(account.code_hash()))?
+                let code_len = get_code(state_update, account_id.clone(), account.code_hash())?
                     .map(|c| c.code().len() as u64)
                     .unwrap_or_default();
                 if let Some(limit) = self.state_size_limit {

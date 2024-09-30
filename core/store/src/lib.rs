@@ -1001,15 +1001,16 @@ pub fn get_access_key_raw(
 ///
 /// Executing all the usual storage access side-effects.
 pub fn get_code(
-    trie: &dyn TrieAccess,
-    account_id: &AccountId,
-    code_hash: Option<CryptoHash>,
+    state_update: &TrieUpdate,
+    account_id: AccountId,
+    code_hash: CryptoHash,
 ) -> Result<Option<ContractCode>, StorageError> {
-    let key = TrieKey::ContractCode { account_id: account_id.clone() };
-    trie.get(&key).map(|opt| opt.map(|code| ContractCode::new(code, code_hash)))
+    state_update.trie().request_code_recording(account_id);
+    state_update.contract_storage.get(code_hash)
 }
 
 pub fn set_code(state_update: &mut TrieUpdate, account_id: AccountId, code: &ContractCode) {
+    // TODO(#11099): Since the code bytes are in DBCol::ContractCode, skip the operations for updating the value.
     state_update.set(TrieKey::ContractCode { account_id }, code.code().to_vec());
     state_update
         .contract_storage
@@ -1017,6 +1018,7 @@ pub fn set_code(state_update: &mut TrieUpdate, account_id: AccountId, code: &Con
 }
 
 fn remove_code(state_update: &mut TrieUpdate, account_id: &AccountId, code_hash: CryptoHash) {
+    // TODO(#11099): Since the code bytes are in DBCol::ContractCode, skip the operations for deleting the value.
     state_update.remove(TrieKey::ContractCode { account_id: account_id.clone() });
     if code_hash != CryptoHash::default() {
         state_update.contract_storage.delete(&code_hash);

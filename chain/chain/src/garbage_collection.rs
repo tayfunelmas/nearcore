@@ -993,7 +993,8 @@ impl<'a> ChainStoreUpdate<'a> {
             | DBCol::EpochSyncProof
             | DBCol::Misc
             | DBCol::_ReceiptIdToShardId
-            | DBCol::ContractCode  // DO NOT MERGE: Should garbage collect?
+            // TODO(#11099): Garbage collect contract code column.
+            | DBCol::ContractCode
             => unreachable!(),
         }
         self.merge(store_update);
