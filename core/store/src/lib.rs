@@ -1011,16 +1011,27 @@ pub fn get_code(
 
 pub fn set_code(state_update: &mut TrieUpdate, account_id: AccountId, code: &ContractCode) {
     state_update.set(TrieKey::ContractCode { account_id }, code.code().to_vec());
-    state_update.contract_storage.store(ContractCode::new(code.code().to_vec(), Some(*code.hash())));
+    state_update
+        .contract_storage
+        .store(ContractCode::new(code.code().to_vec(), Some(*code.hash())));
+}
+
+fn remove_code(state_update: &mut TrieUpdate, account_id: &AccountId, code_hash: CryptoHash) {
+    state_update.remove(TrieKey::ContractCode { account_id: account_id.clone() });
+    if code_hash != CryptoHash::default() {
+        state_update.contract_storage.delete(&code_hash);
+    }
 }
 
 /// Removes account, code and all access keys associated to it.
 pub fn remove_account(
     state_update: &mut TrieUpdate,
     account_id: &AccountId,
+    code_hash: CryptoHash,
 ) -> Result<(), StorageError> {
     state_update.remove(TrieKey::Account { account_id: account_id.clone() });
-    state_update.remove(TrieKey::ContractCode { account_id: account_id.clone() });
+
+    remove_code(state_update, account_id, code_hash);
 
     // Removing access keys
     let lock = state_update.trie().lock_for_iter();

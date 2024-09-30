@@ -1363,8 +1363,8 @@ impl Runtime {
             && migration_flags.is_first_block_with_chunk_of_version
         {
             let account_id = "contractregistry.testnet".parse().unwrap();
-            if get_account(state_update, &account_id)?.is_some() {
-                remove_account(state_update, &account_id)?;
+            if let Some(account) = get_account(state_update, &account_id)? {
+                remove_account(state_update, &account_id, account.code_hash())?;
                 state_update.commit(StateChangeCause::Migration);
             }
         }
