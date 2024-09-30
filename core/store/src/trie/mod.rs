@@ -4,7 +4,6 @@ use self::mem::flexible_data::value::ValueView;
 use self::mem::updating::{UpdatedMemTrieNode, UpdatedMemTrieNodeId};
 use self::trie_recording::TrieRecorder;
 use self::trie_storage::TrieMemoryPartialStorage;
-use crate::adapter::StoreAdapter;
 use crate::flat::{FlatStateChanges, FlatStorageChunkView};
 pub use crate::trie::config::TrieConfig;
 pub(crate) use crate::trie::config::{
@@ -1834,6 +1833,7 @@ pub mod estimator {
 
 #[cfg(test)]
 mod tests {
+    use crate::adapter::StoreAdapter;
     use assert_matches::assert_matches;
     use rand::Rng;
 

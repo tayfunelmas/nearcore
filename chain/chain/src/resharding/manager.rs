@@ -6,6 +6,7 @@ use near_chain_primitives::Error;
 use near_epoch_manager::EpochManagerAdapter;
 use near_primitives::block::Block;
 use near_primitives::challenge::PartialState;
+use near_primitives::contract_distribution::ContractChanges;
 use near_primitives::hash::CryptoHash;
 use near_primitives::shard_layout::get_block_shard_uid;
 use near_primitives::stateless_validation::stored_chunk_state_transition_data::StoredChunkStateTransitionData;
@@ -103,6 +104,8 @@ impl ReshardingManager {
             let state_transition_data = StoredChunkStateTransitionData {
                 base_state: partial_storage.nodes,
                 receipts_hash: CryptoHash::default(),
+                // TODO(#11099): Check protocol version for this.
+                contract_changes: Some(ContractChanges::default()),
             };
 
             // TODO(store): Use proper store interface

@@ -54,7 +54,6 @@ use near_primitives::challenge::{
 };
 use near_primitives::checked_feature;
 use near_primitives::congestion_info::CongestionInfo;
-use near_primitives::contract_distribution::ContractChanges;
 use near_primitives::epoch_block_info::BlockInfo;
 use near_primitives::errors::EpochError;
 use near_primitives::hash::{hash, CryptoHash};
