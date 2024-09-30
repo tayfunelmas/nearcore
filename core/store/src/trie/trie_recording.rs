@@ -531,7 +531,7 @@ mod trie_recording_tests {
             let trie = get_trie_for_shard(&tries, shard_uid, state_root, use_flat_storage);
             trie.accounting_cache.borrow().enable_switch().set(enable_accounting_cache);
             for key in &keys_to_get {
-                assert_eq!(trie.get_impl(key, false).unwrap(), data_in_trie.get(key).cloned());
+                assert_eq!(trie.get_impl(key).unwrap(), data_in_trie.get(key).cloned());
             }
             for key in &keys_to_get_ref {
                 assert_eq!(
@@ -551,7 +551,7 @@ mod trie_recording_tests {
                 .recording_reads();
             trie.accounting_cache.borrow().enable_switch().set(enable_accounting_cache);
             for key in &keys_to_get {
-                assert_eq!(trie.get_impl(key, false).unwrap(), data_in_trie.get(key).cloned());
+                assert_eq!(trie.get_impl(key).unwrap(), data_in_trie.get(key).cloned());
             }
             for key in &keys_to_get_ref {
                 assert_eq!(
@@ -576,7 +576,7 @@ mod trie_recording_tests {
                 .recording_reads();
             trie.accounting_cache.borrow().enable_switch().set(enable_accounting_cache);
             for key in &keys_to_get {
-                assert_eq!(trie.get_impl(key, false).unwrap(), data_in_trie.get(key).cloned());
+                assert_eq!(trie.get_impl(key).unwrap(), data_in_trie.get(key).cloned());
             }
             for key in &keys_to_get_ref {
                 assert_eq!(
@@ -606,7 +606,7 @@ mod trie_recording_tests {
             );
             trie.accounting_cache.borrow().enable_switch().set(enable_accounting_cache);
             for key in &keys_to_get {
-                assert_eq!(trie.get_impl(key, false).unwrap(), data_in_trie.get(key).cloned());
+                assert_eq!(trie.get_impl(key).unwrap(), data_in_trie.get(key).cloned());
             }
             for key in &keys_to_get_ref {
                 assert_eq!(
@@ -629,7 +629,7 @@ mod trie_recording_tests {
             .recording_reads();
             trie.accounting_cache.borrow().enable_switch().set(enable_accounting_cache);
             for key in &keys_to_get {
-                assert_eq!(trie.get_impl(key, false).unwrap(), data_in_trie.get(key).cloned());
+                assert_eq!(trie.get_impl(key).unwrap(), data_in_trie.get(key).cloned());
             }
             for key in &keys_to_get_ref {
                 assert_eq!(

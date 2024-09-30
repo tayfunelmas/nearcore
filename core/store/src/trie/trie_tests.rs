@@ -120,7 +120,7 @@ fn test_reads_with_incomplete_storage() {
             let (key, _) = trie_changes.choose(&mut rng).unwrap();
             println!("Testing lookup {:?}", key);
             let lookup_test = |trie: Trie| -> Result<_, StorageError> {
-                trie.get_impl(key, false).map(move |v| (trie, v))
+                trie.get_impl(key).map(move |v| (trie, v))
             };
             test_incomplete_storage(get_trie(), lookup_test);
         }
@@ -170,7 +170,7 @@ mod nodes_counter_tests {
             .iter()
             .map(|(key, value)| {
                 let initial_count = trie.get_trie_nodes_count().db_reads;
-                let got_value = trie.get_impl(key, false).unwrap();
+                let got_value = trie.get_impl(key).unwrap();
                 assert_eq!(*value, got_value);
                 trie.get_trie_nodes_count().db_reads - initial_count
             })

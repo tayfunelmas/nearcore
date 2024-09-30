@@ -576,7 +576,7 @@ mod tests {
         for part_id in 1..num_parts {
             let nibbles_boundary = trie.find_state_part_boundary(part_id, num_parts).unwrap();
             let key_boundary = NibbleSlice::nibbles_to_bytes(&nibbles_boundary);
-            assert_matches!(trie.get_impl(&key_boundary, false), Ok(Some(_)));
+            assert_matches!(trie.get_impl(&key_boundary), Ok(Some(_)));
         }
 
         let nibbles_boundary = trie.find_state_part_boundary(num_parts, num_parts).unwrap();
@@ -865,7 +865,7 @@ mod tests {
                     trie_recording.find_state_part_boundary(part_id, num_parts).unwrap();
                 let left_key_boundary = NibbleSlice::nibbles_to_bytes(&left_nibbles_boundary);
                 if part_id != 0 {
-                    assert_matches!(trie.get_impl(&left_key_boundary, false), Ok(Some(_)));
+                    assert_matches!(trie.get_impl(&left_key_boundary), Ok(Some(_)));
                 }
                 let PartialState::TrieValues(proof_nodes) =
                     trie_recording.recorded_storage().unwrap().nodes;
