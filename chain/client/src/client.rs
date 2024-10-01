@@ -4,6 +4,7 @@
 use crate::chunk_distribution_network::{ChunkDistributionClient, ChunkDistributionNetwork};
 use crate::chunk_inclusion_tracker::ChunkInclusionTracker;
 use crate::contract_distribution::actor::ContractDistributionSenderForClient;
+use crate::contract_distribution::client::ContractChangesTracker;
 use crate::debug::BlockProductionTracker;
 use crate::debug::PRODUCTION_TIMES_CACHE_SIZE;
 use crate::stateless_validation::chunk_endorsement::ChunkEndorsementTracker;
@@ -80,6 +81,7 @@ use near_primitives::utils::MaybeValidated;
 use near_primitives::validator_signer::ValidatorSigner;
 use near_primitives::version::{ProtocolFeature, PROTOCOL_VERSION};
 use near_primitives::views::{CatchupStatusView, DroppedReason};
+use near_store::adapter::StoreAdapter;
 use near_store::ShardUId;
 use reed_solomon_erasure::galois_8::ReedSolomon;
 use std::cmp::max;
@@ -193,6 +195,7 @@ pub struct Client {
     // Optional value used for the Chunk Distribution Network Feature.
     chunk_distribution_network: Option<ChunkDistributionNetwork>,
     pub contract_distribution_adapter: ContractDistributionSenderForClient,
+    pub contract_changes_tracker: ContractChangesTracker,
 }
 
 impl AsRef<Client> for Client {
@@ -356,6 +359,9 @@ impl Client {
             panic_on_validation_error,
         );
         let chunk_distribution_network = ChunkDistributionNetwork::from_config(&config);
+        let contract_changes_tracker =
+            ContractChangesTracker::new(chain.chain_store().store().contract_store());
+
         Ok(Self {
             #[cfg(feature = "test_features")]
             adv_produce_blocks: None,
@@ -407,6 +413,7 @@ impl Client {
             partial_witness_adapter,
             chunk_distribution_network,
             contract_distribution_adapter,
+            contract_changes_tracker,
         })
     }
 

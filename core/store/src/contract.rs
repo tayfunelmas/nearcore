@@ -23,17 +23,15 @@ impl ContractCodeWithRefcount {
 }
 
 #[derive(Clone, Default)]
-pub struct ContractChangesTracker {
-    changes: Arc<RwLock<BTreeMap<CodeHash, ContractCodeWithRefcount>>>,
-}
+pub struct UncommittedContractChanges(Arc<RwLock<BTreeMap<CodeHash, ContractCodeWithRefcount>>>);
 
-impl ContractChangesTracker {
+impl UncommittedContractChanges {
     fn new() -> Self {
         Self::default()
     }
 
     fn record_deploy(&self, code: ContractCode) {
-        let mut guard = self.changes.write().expect("no panics");
+        let mut guard = self.0.write().expect("no panics");
         let changes = match guard.entry(*code.hash()) {
             Entry::Occupied(o) => {
                 let changes = o.into_mut();
@@ -51,7 +49,7 @@ impl ContractChangesTracker {
     }
 
     fn record_delete(&self, code_hash: &CodeHash) {
-        let mut guard = self.changes.write().expect("no panics");
+        let mut guard = self.0.write().expect("no panics");
         let changes = match guard.entry(*code_hash) {
             Entry::Occupied(o) => o.into_mut(),
             Entry::Vacant(v) => v.insert(ContractCodeWithRefcount::new(None)),
@@ -61,7 +59,7 @@ impl ContractChangesTracker {
 
     fn get(&self, code_hash: &CodeHash) -> Option<ContractCode> {
         // Note: We do not check the refcount but always return the code.
-        let guard = self.changes.read().expect("no panics");
+        let guard = self.0.read().expect("no panics");
         if let Some(changes) = guard.get(code_hash) {
             if let Some(code) = changes.code.as_ref() {
                 debug_assert_eq!(code.hash(), code_hash);
@@ -74,7 +72,7 @@ impl ContractChangesTracker {
     // TODO(#11099): Implement into() operation.
     fn changes(&self) -> ContractChanges {
         let mut changes = ContractChanges::default();
-        let guard = self.changes.read().expect("no panics");
+        let guard = self.0.read().expect("no panics");
         for (code_hash, code_with_refcount) in guard.iter() {
             if code_with_refcount.refcount_delta != 0 {
                 changes.0.push(ContractChange {
@@ -108,12 +106,12 @@ pub struct ContractStorageUpdate {
     /// adjusted to write out the contract into the relevant part of the database immediately
     /// (without going through transactional storage operations and such).
     /// TODO(#11099): Move Arc<> to here.
-    uncommitted_changes: ContractChangesTracker,
+    uncommitted_changes: UncommittedContractChanges,
 }
 
 impl ContractStorageUpdate {
     pub(crate) fn from(storage: Arc<dyn TrieStorage>) -> Self {
-        Self { storage, uncommitted_changes: ContractChangesTracker::new() }
+        Self { storage, uncommitted_changes: UncommittedContractChanges::new() }
     }
 
     pub fn get(&self, code_hash: CodeHash) -> Result<Option<ContractCode>, StorageError> {
@@ -134,7 +132,7 @@ impl ContractStorageUpdate {
     }
 
     pub(crate) fn rollback(&mut self) {
-        self.uncommitted_changes = ContractChangesTracker::new();
+        self.uncommitted_changes = UncommittedContractChanges::new();
     }
 
     pub(crate) fn get_contract_changes(&self) -> ContractChanges {

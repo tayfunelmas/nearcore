@@ -179,7 +179,7 @@ pub fn setup(
         client_adapter.as_multi_sender(),
         signer.clone(),
         epoch_manager.clone(),
-        store.clone(),
+        store.contract_store(),
     ));
     let contract_distribution_adapter = contract_distribution_addr.with_auto_span_context();
 

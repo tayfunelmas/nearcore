@@ -11,11 +11,17 @@ use near_epoch_manager::EpochManagerAdapter;
 use near_network::contract_distribution::SignedEncodedContractChangesMessage;
 use near_network::types::{NetworkRequests, PeerManagerAdapter, PeerManagerMessageRequest};
 use near_performance_metrics_macros::perf;
-use near_primitives::contract_distribution::{ChunkContractChanges, SignedEncodedContractChanges};
+use near_primitives::contract_distribution::{
+    ChunkContractChanges, ChunkContractChangesProof, ContractChanges, SignedEncodedContractChanges,
+};
+use near_primitives::hash::{hash, CryptoHash};
+use near_primitives::sharding::ChunkHash;
+use near_primitives::stateless_validation::ChunkProductionKey;
+use near_store::adapter::contract_store::ContractStoreAdapter;
 use near_store::Store;
+use near_vm_runner::ContractCode;
 
 use crate::client_actor::ClientSenderForContractDistribution;
-use crate::contract_distribution::logic::ContractChangesMessage;
 use crate::stateless_validation::validate::validate_chunk_production_key;
 
 pub struct ContractDistributionActor {
@@ -28,7 +34,7 @@ pub struct ContractDistributionActor {
     my_signer: MutableValidatorSigner,
     /// Epoch manager to get the set of validators
     epoch_manager: Arc<dyn EpochManagerAdapter>,
-    store: Store,
+    store: ContractStoreAdapter,
 }
 
 impl Actor for ContractDistributionActor {}
@@ -37,6 +43,12 @@ impl Actor for ContractDistributionActor {}
 #[rtype(result = "()")]
 pub struct DistributeContractChangesRequest {
     pub contract_changes: ChunkContractChanges,
+}
+
+#[derive(actix::Message, Debug)]
+#[rtype(result = "()")]
+pub struct CommitContractChangesRequest {
+    pub chunks: Vec<ChunkContractChangesProof>,
 }
 
 #[derive(Clone, MultiSend, MultiSenderFrom)]
@@ -67,7 +79,7 @@ impl ContractDistributionActor {
         client_sender: ClientSenderForContractDistribution,
         my_signer: MutableValidatorSigner,
         epoch_manager: Arc<dyn EpochManagerAdapter>,
-        store: Store,
+        store: ContractStoreAdapter,
     ) -> Self {
         Self { network_adapter, client_sender, my_signer, epoch_manager, store }
     }
@@ -129,8 +141,32 @@ impl ContractDistributionActor {
         }
 
         let (changes, _size) = signed_encoded_changes.decode()?;
+
+        validate_contract_changes(&changes.inner())?;
+
+        tracing::info!(target: "code-dist", changes=?changes.inner(), "Received contract changes");
         self.client_sender.send(ContractChangesMessage(changes));
 
         Ok(())
     }
+}
+
+fn validate_contract_changes(changes: &ContractChanges) -> Result<(), Error> {
+    for change in changes.0.iter() {
+        if change.refcount_delta == 0 {
+            return Err(Error::InvalidContractChanges("Refcount delta is zero".to_string()));
+        }
+        if change.code_hash == CryptoHash::default() {
+            return Err(Error::InvalidContractChanges("Code hash is set to default".to_string()));
+        }
+        if let Some(code) = change.code_hash.as_ref() {
+            if code.len() == 0 {
+                return Err(Error::InvalidContractChanges("Code is empty".to_string()));
+            }
+            if hash(code) != change.code_hash {
+                return Err(Error::InvalidContractChanges("Invalid code hash".to_string()));
+            }
+        }
+    }
+    Ok(())
 }

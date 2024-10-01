@@ -1,4 +1,5 @@
 use crate::{DBCol, Store, StoreAdapter, StoreUpdate, StoreUpdateAdapter};
+use near_primitives::contract_distribution::ContractChanges;
 use near_primitives::errors::{MissingTrieValueContext, StorageError};
 use near_primitives::types::{CodeBytes, CodeHash};
 use std::io;
@@ -56,6 +57,10 @@ impl ContractStoreUpdateAdapter<'static> {
     pub fn commit(self) -> io::Result<()> {
         let store_update: StoreUpdate = self.into();
         store_update.commit()
+    }
+
+    pub fn save_contract_changes(&self, changes: ContractChanges) -> io::Result<()> {
+        unimplemented!("TODO(#11099): Implement this.")
     }
 }
 

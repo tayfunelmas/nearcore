@@ -37,6 +37,7 @@ use near_epoch_manager::EpochManagerAdapter;
 use near_network::PeerManagerActor;
 use near_primitives::block::GenesisId;
 use near_primitives::types::EpochId;
+use near_store::adapter::StoreAdapter;
 use near_store::genesis::initialize_sharded_genesis_state;
 use near_store::metadata::DbKind;
 use near_store::metrics::spawn_db_metrics_loop;
@@ -380,7 +381,7 @@ pub fn start_with_config_and_synchronization(
             client_adapter_for_contract_distribution.as_multi_sender(),
             config.validator_signer.clone(),
             epoch_manager.clone(),
-            runtime.store().clone(),
+            runtime.store().contract_store(),
         ));
 
     let (_gc_actor, gc_arbiter) = spawn_actix_actor(GCActor::new(

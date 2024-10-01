@@ -1,11 +1,15 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use bytesize::ByteSize;
 use near_crypto::{PublicKey, Signature};
-use near_primitives_core::types::{BlockHeight, CodeBytes, CodeHash, ShardId};
+use near_primitives_core::{
+    hash::CryptoHash,
+    types::{BlockHeight, CodeBytes, CodeHash, MerkleHash, ShardId},
+};
 use near_schema_checker_lib::ProtocolSchema;
 use std::io::Error;
 
 use crate::{
+    merkle::merklize,
     sharding::{ChunkHash, ShardChunkHeader},
     stateless_validation::{ChunkProductionKey, SignatureDifferentiator},
     types::EpochId,
@@ -33,24 +37,16 @@ impl ContractChangesMetadata {
             height_created: self.height_created,
         }
     }
+
+    pub fn chunk_hash(&self) -> &ChunkHash {
+        &self.chunk_hash
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema)]
 pub struct ChunkContractChanges {
     pub metadata: ContractChangesMetadata,
     pub changes: ContractChanges,
-}
-
-#[derive(
-    Debug, Default, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema,
-)]
-pub struct ContractChanges(pub Vec<ContractChange>);
-
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema)]
-pub struct ContractChange {
-    pub code_hash: CodeHash,
-    pub code: Option<CodeBytes>,
-    pub refcount_delta: u64,
 }
 
 impl ChunkContractChanges {
@@ -67,6 +63,64 @@ impl ChunkContractChanges {
         };
         Self { metadata, changes }
     }
+
+    pub fn chunk_production_key(&self) -> ChunkProductionKey {
+        self.metadata.chunk_production_key()
+    }
+}
+
+impl Into<ContractChanges> for ChunkContractChanges {
+    fn into(self) -> ContractChanges {
+        self.changes
+    }
+}
+
+#[derive(
+    Debug, Default, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema,
+)]
+pub struct ContractChanges(pub Vec<ContractChange>);
+
+impl ContractChanges {
+    pub fn merge_from(&mut self, other: ContractChanges) {
+        // TODO(#11099): Optimize this, for now leaving with a naive implementation.
+        'outer: for other_change in other.0.into_iter() {
+            for my_change in self.0.iter_mut() {
+                if my_change.code_hash == other_change.code_hash {
+                    my_change.refcount_delta += other_change.refcount_delta;
+                    if my_change.code.is_none() && other_change.code.is_some() {
+                        my_change.code = other_change.code;
+                    }
+                    continue 'outer;
+                }
+            }
+            self.0.push(other_change);
+        }
+    }
+
+    pub fn merklize(&self) -> MerkleHash {
+        let (root, _paths) = merklize(self.0.iter().map(|c| c.into()).as_slice());
+        root
+    }
+}
+
+impl Into<CodeHashWithRefCount> for ContractChanges {
+    fn into(self) -> CodeHashWithRefCount {
+        CodeHashWithRefCount { code_hash: self.code_hash, refcount_delta: self.refcount_delta }
+    }
+}
+
+// Used to calculate the merkle hash of the contract changes.
+#[derive(BorshSerialize, ProtocolSchema)]
+struct CodeHashWithRefCount {
+    code_hash: CodeHash,
+    refcount_delta: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema)]
+pub struct ContractChange {
+    pub code_hash: CodeHash,
+    pub code: Option<CodeBytes>,
+    pub refcount_delta: u64,
 }
 
 pub const MAX_UNCOMPRESSED_CONTRACT_CHANGES_SIZE: u64 =
@@ -111,8 +165,12 @@ impl SignedEncodedContractChanges {
         Ok(Self { inner, signature })
     }
 
+    pub fn metadata(&self) -> &ContractChangesMetadata {
+        &self.inner.metadata
+    }
+
     pub fn chunk_production_key(&self) -> ChunkProductionKey {
-        self.inner.metadata.chunk_production_key()
+        self.metadata().chunk_production_key()
     }
 
     pub fn verify(&self, public_key: &PublicKey) -> bool {

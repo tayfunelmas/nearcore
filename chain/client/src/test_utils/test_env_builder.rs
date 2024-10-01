@@ -23,6 +23,7 @@ use near_primitives::epoch_info::RngSeed;
 use near_primitives::epoch_manager::AllEpochConfigTestOverrides;
 use near_primitives::test_utils::create_test_signer;
 use near_primitives::types::{AccountId, NumShards};
+use near_store::adapter::StoreAdapter;
 use near_store::config::StateSnapshotType;
 use near_store::test_utils::create_test_store;
 use near_store::{NodeStorage, ShardUId, Store, StoreConfig, TrieConfig};
@@ -530,7 +531,7 @@ impl TestEnvBuilder {
                     client_sender_for_contract_distribution.clone(),
                     MutableConfigValue::new(Some(validator_signers[i].clone()), "validator_signer"),
                     epoch_managers[i].clone().into_adapter(),
-                    runtimes[i].store().clone(),
+                    runtimes[i].store().contract_store(),
                 ))
             })
             .collect_vec();
