@@ -76,7 +76,7 @@ impl ContractChangesTracker {
             block_contract_changes.merge_from(cache_entry.changes);
         }
         let store_update = self.store.store_update();
-        store_update.save_contract_changes(block_contract_changes)?;
+        store_update.save_block_contract_changes(block_contract_changes)?;
         Ok(store_update.into())
     }
 

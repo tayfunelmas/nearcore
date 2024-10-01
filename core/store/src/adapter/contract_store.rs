@@ -1,6 +1,8 @@
 use crate::{DBCol, Store, StoreAdapter, StoreUpdate, StoreUpdateAdapter};
-use near_primitives::contract_distribution::ContractChanges;
+use near_primitives::contract_distribution::{ChunkContractChanges, ContractChanges};
 use near_primitives::errors::{MissingTrieValueContext, StorageError};
+use near_primitives::hash::CryptoHash;
+use near_primitives::shard_layout::{get_block_shard_uid, ShardUId};
 use near_primitives::types::{CodeBytes, CodeHash};
 use std::io;
 use std::num::NonZero;
@@ -59,8 +61,21 @@ impl ContractStoreUpdateAdapter<'static> {
         store_update.commit()
     }
 
-    pub fn save_contract_changes(&self, _changes: ContractChanges) -> io::Result<()> {
+    pub fn save_block_contract_changes(&self, _changes: ContractChanges) -> io::Result<()> {
         unimplemented!("TODO(#11099): Implement this.")
+    }
+
+    pub fn save_chunk_contract_changes(
+        &mut self,
+        block_hash: &CryptoHash,
+        shard_uid: &ShardUId,
+        changes: &ChunkContractChanges,
+    ) -> io::Result<()> {
+        self.store_update().set_ser(
+            DBCol::ChunkContractChanges,
+            &get_block_shard_uid(block_hash, shard_uid),
+            &changes,
+        )
     }
 }
 

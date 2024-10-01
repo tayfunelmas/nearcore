@@ -304,6 +304,10 @@ pub enum DBCol {
     /// - *Rows*: CryptoHash of the code
     /// - *Column type*: Vec<u8> (code)
     ContractCode,
+    /// Column to store contract code before being committed.
+    /// - *Rows*: BlockChunk (block_hash, shard_uid)
+    /// - *Content type*: ChunkContractChanges
+    ChunkContractChanges,
 }
 
 /// Defines different logical parts of a db key.
@@ -510,7 +514,9 @@ impl DBCol {
             | DBCol::FlatStateDeltaMetadata
             | DBCol::FlatStorageStatus
             | DBCol::EpochSyncProof
-            | DBCol::ContractCode => false,
+            // TODO(#11099): Make this cold storage column.
+            | DBCol::ContractCode
+            | DBCol::ChunkContractChanges => false,
         }
     }
 
@@ -584,6 +590,7 @@ impl DBCol {
             DBCol::LatestWitnessesByIndex => &[DBKeyType::LatestWitnessIndex],
             DBCol::EpochSyncProof => &[DBKeyType::Empty],
             DBCol::ContractCode => &[DBKeyType::CodeHash],
+            DBCol::ChunkContractChanges => &[DBKeyType::BlockHash, DBKeyType::ShardUId],
         }
     }
 }

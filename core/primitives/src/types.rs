@@ -728,6 +728,7 @@ pub mod chunk_extra {
 
     pub use super::ChunkExtraV1;
 
+    // TODO(#11099): Add contract changes root to ChunkExtra.
     /// Information after chunk was processed, used to produce or check next chunk.
     #[derive(Debug, PartialEq, BorshSerialize, BorshDeserialize, Clone, Eq, serde::Serialize)]
     pub enum ChunkExtra {

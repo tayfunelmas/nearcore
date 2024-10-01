@@ -995,6 +995,7 @@ impl<'a> ChainStoreUpdate<'a> {
             | DBCol::_ReceiptIdToShardId
             // TODO(#11099): Garbage collect contract code column.
             | DBCol::ContractCode
+            | DBCol::ChunkContractChanges
             => unreachable!(),
         }
         self.merge(store_update);
