@@ -13,6 +13,7 @@ use near_primitives::challenge::{
     TrieValue,
 };
 use near_primitives::congestion_info::CongestionInfo;
+use near_primitives::contract_distribution::ContractChanges;
 use near_primitives::hash::CryptoHash;
 use near_primitives::merkle::PartialMerkleTree;
 use near_primitives::num_rational::Ratio;
@@ -366,6 +367,9 @@ fn test_verify_chunk_invalid_state_challenge() {
     let congestion_info = ProtocolFeature::CongestionControl
         .enabled(PROTOCOL_VERSION)
         .then_some(CongestionInfo::default());
+    let contract_changes_root = ProtocolFeature::ExcludeContractCodeFromStateWitness
+        .enabled(PROTOCOL_VERSION)
+        .then_some(ContractChanges::default().merklize());
 
     let (mut invalid_chunk, merkle_paths) = ShardsManagerActor::create_encoded_shard_chunk(
         *last_block.hash(),
@@ -382,6 +386,7 @@ fn test_verify_chunk_invalid_state_challenge() {
         last_block.chunks()[0].prev_outgoing_receipts_root(),
         CryptoHash::default(),
         congestion_info,
+        contract_changes_root,
         &validator_signer,
         &rs,
         PROTOCOL_VERSION,

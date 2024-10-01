@@ -4,6 +4,7 @@ use std::fmt::Debug;
 use super::{ChunkProductionKey, SignatureDifferentiator};
 use crate::challenge::PartialState;
 use crate::congestion_info::CongestionInfo;
+use crate::contract_distribution::ContractChanges;
 use crate::sharding::{ChunkHash, ReceiptProof, ShardChunkHeader, ShardChunkHeaderV3};
 use crate::transaction::SignedTransaction;
 use crate::types::EpochId;
@@ -188,6 +189,9 @@ impl ChunkStateWitness {
         let congestion_info = ProtocolFeature::CongestionControl
             .enabled(PROTOCOL_VERSION)
             .then_some(CongestionInfo::default());
+        let contract_changes_root = ProtocolFeature::ExcludeContractCodeFromStateWitness
+            .enabled(PROTOCOL_VERSION)
+            .then_some(ContractChanges::default().merklize());
 
         let header = ShardChunkHeader::V3(ShardChunkHeaderV3::new(
             PROTOCOL_VERSION,
@@ -205,6 +209,7 @@ impl ChunkStateWitness {
             Default::default(),
             Default::default(),
             congestion_info,
+            contract_changes_root,
             &EmptyValidatorSigner::default().into(),
         ));
         Self::new(

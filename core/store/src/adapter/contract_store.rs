@@ -59,7 +59,7 @@ impl ContractStoreUpdateAdapter<'static> {
         store_update.commit()
     }
 
-    pub fn save_contract_changes(&self, changes: ContractChanges) -> io::Result<()> {
+    pub fn save_contract_changes(&self, _changes: ContractChanges) -> io::Result<()> {
         unimplemented!("TODO(#11099): Implement this.")
     }
 }

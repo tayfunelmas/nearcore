@@ -1,4 +1,4 @@
-use crate::{challenge::PartialState, contract_distribution::ContractChanges};
+use crate::challenge::PartialState;
 use borsh::{BorshDeserialize, BorshSerialize};
 use near_primitives_core::hash::CryptoHash;
 use near_schema_checker_lib::ProtocolSchema;
@@ -16,6 +16,4 @@ pub struct StoredChunkStateTransitionData {
     /// but is used to validate against `StateChunkWitness::exact_receipts_hash`
     /// to ease debugging of why a state witness may be incorrect.
     pub receipts_hash: CryptoHash,
-
-    pub contract_changes: Option<ContractChanges>,
 }

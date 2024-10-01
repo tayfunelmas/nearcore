@@ -1,10 +1,8 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use bytesize::ByteSize;
+use itertools::Itertools;
 use near_crypto::{PublicKey, Signature};
-use near_primitives_core::{
-    hash::CryptoHash,
-    types::{BlockHeight, CodeBytes, CodeHash, MerkleHash, ShardId},
-};
+use near_primitives_core::types::{BlockHeight, CodeBytes, CodeHash, MerkleHash, ShardId};
 use near_schema_checker_lib::ProtocolSchema;
 use std::io::Error;
 
@@ -67,6 +65,10 @@ impl ChunkContractChanges {
     pub fn chunk_production_key(&self) -> ChunkProductionKey {
         self.metadata.chunk_production_key()
     }
+
+    pub fn inner(&self) -> &ContractChanges {
+        &self.changes
+    }
 }
 
 impl Into<ContractChanges> for ChunkContractChanges {
@@ -98,14 +100,16 @@ impl ContractChanges {
     }
 
     pub fn merklize(&self) -> MerkleHash {
-        let (root, _paths) = merklize(self.0.iter().map(|c| c.into()).as_slice());
+        let changes: Vec<CodeHashWithRefCount> = self
+            .0
+            .iter()
+            .map(|c| CodeHashWithRefCount {
+                code_hash: c.code_hash,
+                refcount_delta: c.refcount_delta,
+            })
+            .collect_vec();
+        let (root, _paths) = merklize(changes.as_slice());
         root
-    }
-}
-
-impl Into<CodeHashWithRefCount> for ContractChanges {
-    fn into(self) -> CodeHashWithRefCount {
-        CodeHashWithRefCount { code_hash: self.code_hash, refcount_delta: self.refcount_delta }
     }
 }
 

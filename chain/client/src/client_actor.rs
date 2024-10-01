@@ -10,7 +10,7 @@ use crate::client::AdvProduceBlocksMode;
 use crate::client::{Client, EPOCH_START_INFO_BLOCKS};
 use crate::config_updater::ConfigUpdater;
 use crate::contract_distribution::actor::ContractDistributionSenderForClient;
-use crate::contract_distribution::logic::ContractChangesMessage;
+use crate::contract_distribution::client::ContractChangesMessage;
 use crate::debug::new_network_info_view;
 use crate::info::{display_sync_status, InfoHelper};
 use crate::stateless_validation::partial_witness::partial_witness_actor::PartialWitnessSenderForClient;

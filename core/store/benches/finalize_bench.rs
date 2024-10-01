@@ -20,6 +20,7 @@ use near_chain::Chain;
 use near_chunks::shards_manager_actor::ShardsManagerActor;
 use near_crypto::{InMemorySigner, KeyType};
 use near_primitives::congestion_info::CongestionInfo;
+use near_primitives::contract_distribution::ContractChanges;
 use near_primitives::hash::CryptoHash;
 use near_primitives::merkle::{merklize, MerklePathItem};
 use near_primitives::receipt::{ActionReceipt, DataReceipt, Receipt, ReceiptEnum, ReceiptV0};
@@ -119,6 +120,9 @@ fn create_chunk_header(height: u64, shard_id: u64) -> ShardChunkHeader {
     let congestion_info = ProtocolFeature::CongestionControl
         .enabled(PROTOCOL_VERSION)
         .then_some(CongestionInfo::default());
+    let contract_changes_root = ProtocolFeature::ExcludeContractCodeFromStateWitness
+        .enabled(PROTOCOL_VERSION)
+        .then_some(ContractChanges::default().merklize());
 
     ShardChunkHeader::V3(ShardChunkHeaderV3::new(
         PROTOCOL_VERSION,
@@ -136,6 +140,7 @@ fn create_chunk_header(height: u64, shard_id: u64) -> ShardChunkHeader {
         CryptoHash::default(),
         vec![],
         congestion_info,
+        contract_changes_root,
         &validator_signer().into(),
     ))
 }
@@ -192,6 +197,9 @@ fn create_encoded_shard_chunk(
     let congestion_info = ProtocolFeature::CongestionControl
         .enabled(PROTOCOL_VERSION)
         .then_some(CongestionInfo::default());
+    let contract_changes_root = ProtocolFeature::ExcludeContractCodeFromStateWitness
+        .enabled(PROTOCOL_VERSION)
+        .then_some(ContractChanges::default().merklize());
 
     ShardsManagerActor::create_encoded_shard_chunk(
         Default::default(),
@@ -208,6 +216,7 @@ fn create_encoded_shard_chunk(
         Default::default(),
         Default::default(),
         congestion_info,
+        contract_changes_root,
         &validator_signer().into(),
         &rs,
         100,

@@ -197,6 +197,7 @@ mod tests {
             ShardChunkHeader::V3(header) => match &mut header.inner {
                 ShardChunkHeaderInner::V2(inner) => inner.encoded_length = encoded_length,
                 ShardChunkHeaderInner::V3(inner) => inner.encoded_length = encoded_length,
+                ShardChunkHeaderInner::V4(inner) => inner.encoded_length = encoded_length,
                 _ => unimplemented!(),
             },
             _ => unimplemented!(),

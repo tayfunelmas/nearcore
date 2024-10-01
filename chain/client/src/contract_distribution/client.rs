@@ -1,9 +1,12 @@
+use std::num::NonZeroUsize;
+
 use lru::LruCache;
 use near_primitives::{
     block::ChunksCollection,
     contract_distribution::{ChunkContractChanges, ContractChanges},
     sharding::{ChunkHash, ShardChunkHeader},
     stateless_validation::ChunkProductionKey,
+    types::EpochId,
 };
 use near_store::{adapter::contract_store::ContractStoreAdapter, StoreUpdate};
 
@@ -14,12 +17,12 @@ use near_chain::Error;
 #[rtype(result = "()")]
 pub struct ContractChangesMessage(pub ChunkContractChanges);
 
+#[derive(Debug)]
 struct ContractChangesCacheEntry {
     changes: ContractChanges,
     chunk_hash: ChunkHash,
 }
 
-#[derive(Debug)]
 pub struct ContractChangesTracker {
     store: ContractStoreAdapter,
     // We currently store the received ContractChanges messages until they are validated by the chunk headers in the new block.
@@ -29,7 +32,7 @@ pub struct ContractChangesTracker {
 
 impl ContractChangesTracker {
     pub fn new(store: ContractStoreAdapter) -> Self {
-        let uncommited_changes = LruCache::new(NonZeroUsize::new(10).unwrap());
+        let uncommitted_changes = LruCache::new(NonZeroUsize::new(10).unwrap());
         Self { store, uncommitted_changes }
     }
 
@@ -43,17 +46,21 @@ impl ContractChangesTracker {
         let existing = self.uncommitted_changes.put(cache_key, cache_entry);
         assert!(
             existing.is_none(),
-            "Has cache entry with same chunk info: {?:}",
+            "Has cache entry with same chunk info: {:?}",
             existing.unwrap()
         );
         Ok(())
     }
 
-    fn save_contract_changes(&mut self, chunks: ChunksCollection) -> Result<StoreUpdate, Error> {
+    fn save_contract_changes(
+        &mut self,
+        epoch_id: &EpochId,
+        chunks: ChunksCollection,
+    ) -> Result<StoreUpdate, Error> {
         let mut block_contract_changes = ContractChanges::default();
         for chunk_header in chunks.iter() {
             let chunk_key = ChunkProductionKey {
-                epoch_id: chunk_header.epoch_id(),
+                epoch_id: *epoch_id,
                 height_created: chunk_header.height_created(),
                 shard_id: chunk_header.shard_id(),
             };
@@ -61,8 +68,8 @@ impl ContractChangesTracker {
                 panic!("Failed to find contract changes for chunk production key: {:?}", chunk_key)
             };
             // Validate chunk hash and merkelized root before merging with others.
-            if let Err(error) = validate_contract_changes(&cache_entry, chunk_header) {
-                tracing::error!("Failed to validate contract changes for chunk: {#}", error);
+            if let Err(error) = Self::validate_contract_changes(&cache_entry, chunk_header) {
+                tracing::error!("Failed to validate contract changes for chunk: {:#}", error);
                 continue;
             }
 
@@ -77,10 +84,10 @@ impl ContractChangesTracker {
         cache_entry: &ContractChangesCacheEntry,
         chunk_header: &ShardChunkHeader,
     ) -> Result<(), Error> {
-        if cache_entry.chunk_hash() != chunk_header.chunk_hash() {
+        if cache_entry.chunk_hash != chunk_header.chunk_hash() {
             return Err(Error::InvalidContractChanges("Invalid chunk hash".to_string()));
         }
-        if cache_entry.changes.merkle_root() != chunk_header.contract_changes_root() {
+        if cache_entry.changes.merklize() != chunk_header.contract_changes_root().unwrap() {
             return Err(Error::InvalidContractChanges(
                 "Invalid merkle root for contract changes".to_string(),
             ));

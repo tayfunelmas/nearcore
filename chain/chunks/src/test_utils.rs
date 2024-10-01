@@ -7,6 +7,7 @@ use near_epoch_manager::EpochManagerHandle;
 use near_network::shards_manager::ShardsManagerRequestFromNetwork;
 use near_network::test_utils::MockPeerManagerAdapter;
 use near_primitives::congestion_info::CongestionInfo;
+use near_primitives::contract_distribution::ContractChanges;
 use near_primitives::hash::CryptoHash;
 use near_primitives::merkle::{self, MerklePath};
 use near_primitives::receipt::Receipt;
@@ -138,6 +139,10 @@ impl ChunkTestFixture {
         let congestion_info = ProtocolFeature::CongestionControl
             .enabled(PROTOCOL_VERSION)
             .then_some(CongestionInfo::default());
+        // TODO(#11099): Simplify this to a short method call to ContractChanges.
+        let contract_changes_root = ProtocolFeature::ExcludeContractCodeFromStateWitness
+            .enabled(PROTOCOL_VERSION)
+            .then_some(ContractChanges::default().merklize());
         let (mock_chunk, mock_merkle_paths) = ShardsManagerActor::create_encoded_shard_chunk(
             mock_parent_hash,
             Default::default(),
@@ -153,6 +158,7 @@ impl ChunkTestFixture {
             receipts_root,
             MerkleHash::default(),
             congestion_info,
+            contract_changes_root,
             &signer,
             &rs,
             PROTOCOL_VERSION,

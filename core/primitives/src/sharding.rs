@@ -11,6 +11,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use near_crypto::Signature;
 use near_fmt::AbbrBytes;
 use near_schema_checker_lib::ProtocolSchema;
+use shard_chunk_header_inner::ShardChunkHeaderInnerV4;
 use std::cmp::Ordering;
 use std::sync::Arc;
 use tracing::debug_span;
@@ -194,9 +195,31 @@ impl ShardChunkHeaderV3 {
         tx_root: CryptoHash,
         prev_validator_proposals: Vec<ValidatorStake>,
         congestion_info: Option<CongestionInfo>,
+        contract_changes_root: Option<CryptoHash>,
         signer: &ValidatorSigner,
     ) -> Self {
-        let inner = if let Some(congestion_info) = congestion_info {
+        let inner = if let Some(contract_changes_root) = contract_changes_root {
+            assert!(ProtocolFeature::ExcludeContractCodeFromStateWitness.enabled(protocol_version));
+            let congestion_info = congestion_info
+                .unwrap_or_else(|| panic!("Congestion control must be launched before"));
+            ShardChunkHeaderInner::V4(ShardChunkHeaderInnerV4 {
+                prev_block_hash,
+                prev_state_root,
+                prev_outcome_root,
+                encoded_merkle_root,
+                encoded_length,
+                height_created: height,
+                shard_id,
+                prev_gas_used,
+                gas_limit,
+                prev_balance_burnt,
+                prev_outgoing_receipts_root,
+                tx_root,
+                prev_validator_proposals,
+                congestion_info,
+                contract_changes_root,
+            })
+        } else if let Some(congestion_info) = congestion_info {
             assert!(ProtocolFeature::CongestionControl.enabled(protocol_version));
             ShardChunkHeaderInner::V3(ShardChunkHeaderInnerV3 {
                 prev_block_hash,
@@ -439,12 +462,24 @@ impl ShardChunkHeader {
         }
     }
 
+    /// Contract changes, if the feature is enabled on the chunk, `None`` otherwise.
+    #[inline]
+    pub fn contract_changes_root(&self) -> Option<MerkleHash> {
+        match self {
+            Self::V1(_) => None,
+            Self::V2(_) => None,
+            Self::V3(header) => header.inner.contract_changes_root(),
+        }
+    }
+
     /// Returns whether the header is valid for given `ProtocolVersion`.
     pub fn valid_for(&self, version: ProtocolVersion) -> bool {
         const BLOCK_HEADER_V3_VERSION: ProtocolVersion =
             ProtocolFeature::BlockHeaderV3.protocol_version();
         const CONGESTION_CONTROL_VERSION: ProtocolVersion =
             ProtocolFeature::CongestionControl.protocol_version();
+        const EXCLUDE_CODE_FROM_STATE_WITNESS_VERSION: ProtocolVersion =
+            ProtocolFeature::ExcludeContractCodeFromStateWitness.protocol_version();
 
         match &self {
             ShardChunkHeader::V1(_) => version < SHARD_CHUNK_HEADER_UPGRADE_VERSION,
@@ -460,6 +495,7 @@ impl ShardChunkHeader {
                 // enabled does not have the congestion info.
                 ShardChunkHeaderInner::V2(_) => version >= BLOCK_HEADER_V3_VERSION,
                 ShardChunkHeaderInner::V3(_) => version >= CONGESTION_CONTROL_VERSION,
+                ShardChunkHeaderInner::V4(_) => version >= EXCLUDE_CODE_FROM_STATE_WITNESS_VERSION,
             },
         }
     }
@@ -1060,6 +1096,7 @@ impl EncodedShardChunk {
         prev_outgoing_receipts: &[Receipt],
         prev_outgoing_receipts_root: CryptoHash,
         congestion_info: Option<CongestionInfo>,
+        contract_changes_root: Option<MerkleHash>,
         signer: &ValidatorSigner,
         protocol_version: ProtocolVersion,
     ) -> Result<(Self, Vec<MerklePath>), std::io::Error> {
@@ -1133,6 +1170,7 @@ impl EncodedShardChunk {
                 tx_root,
                 prev_validator_proposals,
                 congestion_info,
+                contract_changes_root,
                 signer,
             );
             let chunk = EncodedShardChunkV2 { header: ShardChunkHeader::V3(header), content };

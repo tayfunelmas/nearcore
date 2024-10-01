@@ -228,6 +228,7 @@ pub fn create_chunk(
             decoded_chunk.prev_outgoing_receipts(),
             header.prev_outgoing_receipts_root(),
             header.congestion_info(),
+            None, // TODO(#11099): Fix this.
             &*signer,
             PROTOCOL_VERSION,
         )

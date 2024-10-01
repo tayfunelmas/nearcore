@@ -114,7 +114,6 @@ mod tests {
     use std::sync::Arc;
 
     use near_primitives::block_header::{BlockHeader, BlockHeaderInnerLite, BlockHeaderV4};
-    use near_primitives::contract_distribution::ContractChanges;
     use near_primitives::hash::{hash, CryptoHash};
     use near_primitives::stateless_validation::stored_chunk_state_transition_data::StoredChunkStateTransitionData;
     use near_primitives::types::{BlockHeight, EpochId, ShardId};
@@ -212,8 +211,6 @@ mod tests {
                 &StoredChunkStateTransitionData {
                     base_state: Default::default(),
                     receipts_hash: Default::default(),
-                    // TODO(#11099): Check protocol version for this.
-                    contract_changes: Some(ContractChanges::default()),
                 },
             )
             .unwrap();
