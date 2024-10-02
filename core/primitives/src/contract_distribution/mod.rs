@@ -99,6 +99,8 @@ impl ContractChanges {
         }
     }
 
+    // TODO(#11099): Use CryptoHash::default() for the default root hash.
+    // For this, search for .then_some(ContractChanges::default().merklize());
     pub fn merklize(&self) -> MerkleHash {
         let changes: Vec<CodeHashWithRefCount> = self
             .0

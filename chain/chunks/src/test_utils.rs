@@ -139,7 +139,6 @@ impl ChunkTestFixture {
         let congestion_info = ProtocolFeature::CongestionControl
             .enabled(PROTOCOL_VERSION)
             .then_some(CongestionInfo::default());
-        // TODO(#11099): Simplify this to a short method call to ContractChanges.
         let contract_changes_root = ProtocolFeature::ExcludeContractCodeFromStateWitness
             .enabled(PROTOCOL_VERSION)
             .then_some(ContractChanges::default().merklize());

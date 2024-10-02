@@ -11,9 +11,7 @@ use near_epoch_manager::EpochManagerAdapter;
 use near_network::contract_distribution::SignedEncodedContractChangesMessage;
 use near_network::types::{NetworkRequests, PeerManagerAdapter, PeerManagerMessageRequest};
 use near_performance_metrics_macros::perf;
-use near_primitives::contract_distribution::{
-    ChunkContractChanges, ContractChanges, SignedEncodedContractChanges,
-};
+use near_primitives::contract_distribution::{ContractChanges, SignedEncodedContractChanges};
 use near_primitives::hash::{hash, CryptoHash};
 use near_primitives::types::ShardId;
 use near_store::adapter::contract_store::ContractStoreAdapter;

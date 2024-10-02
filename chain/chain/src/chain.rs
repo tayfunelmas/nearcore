@@ -54,6 +54,7 @@ use near_primitives::challenge::{
 };
 use near_primitives::checked_feature;
 use near_primitives::congestion_info::CongestionInfo;
+use near_primitives::contract_distribution::ContractChanges;
 use near_primitives::epoch_block_info::BlockInfo;
 use near_primitives::errors::EpochError;
 use near_primitives::hash::{hash, CryptoHash};
@@ -599,10 +600,14 @@ impl Chain {
         genesis_protocol_version: ProtocolVersion,
         congestion_info: Option<CongestionInfo>,
     ) -> ChunkExtra {
+        let contract_changes_root = ProtocolFeature::ExcludeContractCodeFromStateWitness
+            .enabled(genesis_protocol_version)
+            .then_some(ContractChanges::default().merklize());
         ChunkExtra::new(
             genesis_protocol_version,
             state_root,
             CryptoHash::default(),
+            contract_changes_root,
             vec![],
             0,
             gas_limit,

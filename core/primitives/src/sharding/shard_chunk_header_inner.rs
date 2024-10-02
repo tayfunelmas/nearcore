@@ -277,6 +277,6 @@ pub struct ShardChunkHeaderInnerV4 {
     pub prev_validator_proposals: Vec<ValidatorStake>,
     /// Congestion info about this shard after the previous chunk was applied.
     pub congestion_info: CongestionInfo,
-    // Contract changes.
+    /// Contract changes root after the previous chunk was applied.
     pub contract_changes_root: MerkleHash,
 }

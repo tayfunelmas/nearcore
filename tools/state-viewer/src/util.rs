@@ -105,10 +105,13 @@ fn chunk_extras_equal(l: &ChunkExtra, r: &ChunkExtra) -> bool {
         (ChunkExtra::V1(l), ChunkExtra::V1(r)) => return l == r,
         (ChunkExtra::V2(l), ChunkExtra::V2(r)) => return l == r,
         (ChunkExtra::V3(l), ChunkExtra::V3(r)) => return l == r,
+        (ChunkExtra::V4(l), ChunkExtra::V4(r)) => return l == r,
         (ChunkExtra::V1(_), ChunkExtra::V2(_))
         | (ChunkExtra::V2(_), ChunkExtra::V1(_))
         | (_, ChunkExtra::V3(_))
-        | (ChunkExtra::V3(_), _) => {}
+        | (ChunkExtra::V3(_), _)
+        | (_, ChunkExtra::V4(_))
+        | (ChunkExtra::V4(_), _) => {}
     };
     if l.state_root() != r.state_root() {
         return false;
@@ -141,6 +144,7 @@ pub fn resulting_chunk_extra(
         protocol_version,
         &result.new_root,
         outcome_root,
+        result.contract_changes_root(),
         result.validator_proposals.clone(),
         result.total_gas_burnt,
         gas_limit,

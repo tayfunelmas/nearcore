@@ -119,6 +119,7 @@ impl<'a> ChainUpdate<'a> {
                         protocol_version,
                         &apply_result.new_root,
                         outcome_root,
+                        apply_result.contract_changes_root(),
                         apply_result.validator_proposals,
                         apply_result.total_gas_burnt,
                         gas_limit,
@@ -558,6 +559,7 @@ impl<'a> ChainUpdate<'a> {
         )?;
         self.chain_store_update.merge(store_update.into());
 
+        let contract_changes_root = apply_result.contract_changes_root();
         self.chain_store_update.save_trie_changes(apply_result.trie_changes);
 
         let epoch_id = self.epoch_manager.get_epoch_id(block_header.hash())?;
@@ -567,6 +569,7 @@ impl<'a> ChainUpdate<'a> {
             protocol_version,
             &apply_result.new_root,
             outcome_root,
+            contract_changes_root,
             apply_result.validator_proposals,
             apply_result.total_gas_burnt,
             gas_limit,

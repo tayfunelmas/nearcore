@@ -101,8 +101,8 @@ pub struct ApplyChunkResult {
     /// The congestion info of the shard after applying the chunk. This field
     /// should be set to None for chunks before the CongestionControl protocol
     /// version and Some otherwise.
-    pub congestion_info: Option<CongestionInfo>,
     /// Contract changes observed while applying the chunk.
+    pub congestion_info: Option<CongestionInfo>,
     /// If the separation of contract changes is enabled, this field is always
     /// present (Some) but possibly containing an empty list of changes.
     pub contract_changes: Option<ContractChanges>,
@@ -121,6 +121,10 @@ impl ApplyChunkResult {
             result.push(outcome_with_id.to_hashes());
         }
         merklize(&result)
+    }
+
+    pub fn contract_changes_root(&self) -> Option<MerkleHash> {
+        self.contract_changes.as_ref().map(|c| c.merklize())
     }
 }
 

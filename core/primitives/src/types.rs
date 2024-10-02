@@ -719,11 +719,12 @@ pub struct BlockExtra {
 
 pub mod chunk_extra {
     use crate::congestion_info::CongestionInfo;
+    use crate::contract_distribution::ContractChanges;
     use crate::types::validator_stake::{ValidatorStake, ValidatorStakeIter};
     use crate::types::StateRoot;
     use borsh::{BorshDeserialize, BorshSerialize};
     use near_primitives_core::hash::CryptoHash;
-    use near_primitives_core::types::{Balance, Gas, ProtocolVersion};
+    use near_primitives_core::types::{Balance, Gas, MerkleHash, ProtocolVersion};
     use near_primitives_core::version::{ProtocolFeature, PROTOCOL_VERSION};
 
     pub use super::ChunkExtraV1;
@@ -735,6 +736,7 @@ pub mod chunk_extra {
         V1(ChunkExtraV1),
         V2(ChunkExtraV2),
         V3(ChunkExtraV3),
+        V4(ChunkExtraV4),
     }
 
     #[derive(Debug, PartialEq, BorshSerialize, BorshDeserialize, Clone, Eq, serde::Serialize)]
@@ -772,6 +774,27 @@ pub mod chunk_extra {
         congestion_info: CongestionInfo,
     }
 
+    /// V3 -> V4: add contract_changes_root.
+    #[derive(Debug, PartialEq, BorshSerialize, BorshDeserialize, Clone, Eq, serde::Serialize)]
+    pub struct ChunkExtraV4 {
+        /// Post state root after applying give chunk.
+        pub state_root: StateRoot,
+        /// Root of merklizing results of receipts (transactions) execution.
+        pub outcome_root: CryptoHash,
+        /// Validator proposals produced by given chunk.
+        pub validator_proposals: Vec<ValidatorStake>,
+        /// Actually how much gas were used.
+        pub gas_used: Gas,
+        /// Gas limit, allows to increase or decrease limit based on expected time vs real time for computing the chunk.
+        pub gas_limit: Gas,
+        /// Total balance burnt after processing the current chunk.
+        pub balance_burnt: Balance,
+        /// Congestion info about this shard after the chunk was applied.
+        congestion_info: CongestionInfo,
+        /// Contract changes root after the previous chunk was applied.
+        contract_changes_root: MerkleHash,
+    }
+
     impl ChunkExtra {
         /// This method creates a slimmed down and invalid ChunkExtra. It's used
         /// for resharding where we only need the state root. This should not be
@@ -784,10 +807,15 @@ pub mod chunk_extra {
             } else {
                 None
             };
+            let contract_changes_root = ProtocolFeature::ExcludeContractCodeFromStateWitness
+                .enabled(PROTOCOL_VERSION)
+                .then_some(ContractChanges::default().merklize());
+
             Self::new(
                 PROTOCOL_VERSION,
                 state_root,
                 CryptoHash::default(),
+                contract_changes_root,
                 vec![],
                 0,
                 0,
@@ -800,14 +828,31 @@ pub mod chunk_extra {
             protocol_version: ProtocolVersion,
             state_root: &StateRoot,
             outcome_root: CryptoHash,
+            contract_changes_root: Option<MerkleHash>,
             validator_proposals: Vec<ValidatorStake>,
             gas_used: Gas,
             gas_limit: Gas,
             balance_burnt: Balance,
             congestion_info: Option<CongestionInfo>,
         ) -> Self {
-            if ProtocolFeature::CongestionControl.enabled(protocol_version) {
-                assert!(congestion_info.is_some());
+            if let Some(contract_changes_root) = contract_changes_root {
+                assert!(
+                    ProtocolFeature::ExcludeContractCodeFromStateWitness.enabled(protocol_version)
+                );
+                let congestion_info = congestion_info
+                    .unwrap_or_else(|| panic!("Congestion control must be launched before"));
+                Self::V4(ChunkExtraV4 {
+                    state_root: *state_root,
+                    outcome_root,
+                    validator_proposals,
+                    gas_used,
+                    gas_limit,
+                    balance_burnt,
+                    congestion_info,
+                    contract_changes_root,
+                })
+            } else if let Some(congestion_info) = congestion_info {
+                assert!(ProtocolFeature::CongestionControl.enabled(protocol_version));
                 Self::V3(ChunkExtraV3 {
                     state_root: *state_root,
                     outcome_root,
@@ -815,7 +860,7 @@ pub mod chunk_extra {
                     gas_used,
                     gas_limit,
                     balance_burnt,
-                    congestion_info: congestion_info.unwrap(),
+                    congestion_info,
                 })
             } else {
                 assert!(congestion_info.is_none());
@@ -833,63 +878,70 @@ pub mod chunk_extra {
         #[inline]
         pub fn outcome_root(&self) -> &StateRoot {
             match self {
-                Self::V1(v1) => &v1.outcome_root,
-                Self::V2(v2) => &v2.outcome_root,
-                Self::V3(v3) => &v3.outcome_root,
+                Self::V1(inner) => &inner.outcome_root,
+                Self::V2(inner) => &inner.outcome_root,
+                Self::V3(inner) => &inner.outcome_root,
+                Self::V4(inner) => &inner.outcome_root,
             }
         }
 
         #[inline]
         pub fn state_root(&self) -> &StateRoot {
             match self {
-                Self::V1(v1) => &v1.state_root,
-                Self::V2(v2) => &v2.state_root,
-                Self::V3(v3) => &v3.state_root,
+                Self::V1(inner) => &inner.state_root,
+                Self::V2(inner) => &inner.state_root,
+                Self::V3(inner) => &inner.state_root,
+                Self::V4(inner) => &inner.state_root,
             }
         }
 
         #[inline]
         pub fn state_root_mut(&mut self) -> &mut StateRoot {
             match self {
-                Self::V1(v1) => &mut v1.state_root,
-                Self::V2(v2) => &mut v2.state_root,
-                Self::V3(v3) => &mut v3.state_root,
+                Self::V1(inner) => &mut inner.state_root,
+                Self::V2(inner) => &mut inner.state_root,
+                Self::V3(inner) => &mut inner.state_root,
+                Self::V4(inner) => &mut inner.state_root,
             }
         }
 
         #[inline]
         pub fn validator_proposals(&self) -> ValidatorStakeIter {
             match self {
-                Self::V1(v1) => ValidatorStakeIter::v1(&v1.validator_proposals),
-                Self::V2(v2) => ValidatorStakeIter::new(&v2.validator_proposals),
-                Self::V3(v3) => ValidatorStakeIter::new(&v3.validator_proposals),
+                Self::V1(inner) => ValidatorStakeIter::v1(&inner.validator_proposals),
+                Self::V2(inner) => ValidatorStakeIter::new(&inner.validator_proposals),
+                Self::V3(inner) => ValidatorStakeIter::new(&inner.validator_proposals),
+                Self::V4(inner) => ValidatorStakeIter::new(&inner.validator_proposals),
             }
         }
 
         #[inline]
         pub fn gas_limit(&self) -> Gas {
             match self {
-                Self::V1(v1) => v1.gas_limit,
-                Self::V2(v2) => v2.gas_limit,
-                Self::V3(v3) => v3.gas_limit,
+                Self::V1(inner) => inner.gas_limit,
+                Self::V2(inner) => inner.gas_limit,
+                Self::V3(inner) => inner.gas_limit,
+                Self::V4(inner) => inner.gas_limit,
             }
         }
 
         #[inline]
         pub fn gas_used(&self) -> Gas {
             match self {
-                Self::V1(v1) => v1.gas_used,
-                Self::V2(v2) => v2.gas_used,
-                Self::V3(v3) => v3.gas_used,
+                Self::V1(inner) => inner.gas_used,
+                Self::V2(inner) => inner.gas_used,
+                Self::V3(inner) => inner.gas_used,
+                Self::V4(inner) => inner.gas_used,
             }
         }
 
         #[inline]
         pub fn balance_burnt(&self) -> Balance {
             match self {
-                Self::V1(v1) => v1.balance_burnt,
-                Self::V2(v2) => v2.balance_burnt,
-                Self::V3(v3) => v3.balance_burnt,
+                Self::V1(inner) => inner.balance_burnt,
+                Self::V2(inner) => inner.balance_burnt,
+                Self::V3(inner) => inner.balance_burnt,
+                Self::V4(inner) => inner.balance_burnt,
             }
         }
 
@@ -898,7 +950,18 @@ pub mod chunk_extra {
             match self {
                 Self::V1(_) => None,
                 Self::V2(_) => None,
-                Self::V3(v3) => v3.congestion_info.into(),
+                Self::V3(inner) => inner.congestion_info.into(),
+                Self::V4(inner) => inner.congestion_info.into(),
+            }
+        }
+
+        #[inline]
+        pub fn contract_changes_root(&self) -> Option<MerkleHash> {
+            match self {
+                Self::V1(_) => None,
+                Self::V2(_) => None,
+                Self::V3(_) => None,
+                Self::V4(inner) => inner.contract_changes_root.into(),
             }
         }
     }

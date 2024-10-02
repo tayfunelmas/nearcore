@@ -15,6 +15,7 @@ use near_primitives::account::id::AccountIdRef;
 use near_primitives::block::Tip;
 use near_primitives::challenge::SlashedValidator;
 use near_primitives::congestion_info::CongestionInfo;
+use near_primitives::contract_distribution::ContractChanges;
 use near_primitives::epoch_block_info::BlockInfoV3;
 use near_primitives::epoch_manager::EpochConfig;
 use near_primitives::hash::hash;
@@ -3287,6 +3288,9 @@ fn test_chunk_header(h: &[CryptoHash], signer: &ValidatorSigner) -> ShardChunkHe
     let congestion_info = ProtocolFeature::CongestionControl
         .enabled(PROTOCOL_VERSION)
         .then_some(CongestionInfo::default());
+    let contract_changes_root = ProtocolFeature::ExcludeContractCodeFromStateWitness
+        .enabled(PROTOCOL_VERSION)
+        .then_some(ContractChanges::default().merklize());
     ShardChunkHeader::V3(ShardChunkHeaderV3::new(
         PROTOCOL_VERSION,
         h[0],
@@ -3303,7 +3307,7 @@ fn test_chunk_header(h: &[CryptoHash], signer: &ValidatorSigner) -> ShardChunkHe
         h[2],
         vec![],
         congestion_info,
-        None,
+        contract_changes_root,
         signer,
     ))
 }

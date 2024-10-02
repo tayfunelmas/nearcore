@@ -287,6 +287,7 @@ mod trie_recording_tests {
     use borsh::BorshDeserialize;
     use near_primitives::challenge::PartialState;
     use near_primitives::congestion_info::CongestionInfo;
+    use near_primitives::contract_distribution::ContractChanges;
     use near_primitives::hash::{hash, CryptoHash};
     use near_primitives::shard_layout::{get_block_shard_uid, ShardUId};
     use near_primitives::state::ValueRef;
@@ -350,12 +351,16 @@ mod trie_recording_tests {
         let congestion_info = ProtocolFeature::CongestionControl
             .enabled(PROTOCOL_VERSION)
             .then(CongestionInfo::default);
+        let contract_changes_root = ProtocolFeature::ExcludeContractCodeFromStateWitness
+            .enabled(PROTOCOL_VERSION)
+            .then_some(ContractChanges::default().merklize());
 
         // ChunkExtra is needed for in-memory trie loading code to query state roots.
         let chunk_extra = ChunkExtra::new(
             PROTOCOL_VERSION,
             &state_root,
             CryptoHash::default(),
+            contract_changes_root,
             Vec::new(),
             0,
             0,

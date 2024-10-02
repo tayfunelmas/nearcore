@@ -9,6 +9,7 @@ use crate::{
 use itertools::Itertools;
 use near_primitives::account::id::AccountId;
 use near_primitives::congestion_info::CongestionInfo;
+use near_primitives::contract_distribution::ContractChanges;
 use near_primitives::hash::CryptoHash;
 use near_primitives::receipt::{DataReceipt, PromiseYieldTimeout, Receipt, ReceiptEnum, ReceiptV1};
 use near_primitives::shard_layout::{get_block_shard_uid, ShardUId, ShardVersion};
@@ -163,10 +164,14 @@ impl TestTriesBuilder {
             let congestion_info = ProtocolFeature::CongestionControl
                 .enabled(PROTOCOL_VERSION)
                 .then(CongestionInfo::default);
+            let contract_changes_root = ProtocolFeature::ExcludeContractCodeFromStateWitness
+                .enabled(PROTOCOL_VERSION)
+                .then_some(ContractChanges::default().merklize());
             let chunk_extra = ChunkExtra::new(
                 PROTOCOL_VERSION,
                 &Trie::EMPTY_ROOT,
                 CryptoHash::default(),
+                contract_changes_root,
                 Vec::new(),
                 0,
                 0,

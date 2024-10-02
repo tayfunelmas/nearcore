@@ -231,6 +231,7 @@ fn apply_block_from_range(
         protocol_version,
         &apply_result.new_root,
         outcome_root,
+        apply_result.contract_changes_root(),
         apply_result.validator_proposals.clone(),
         apply_result.total_gas_burnt,
         genesis.config.gas_limit,

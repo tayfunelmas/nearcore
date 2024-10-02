@@ -507,6 +507,7 @@ pub fn apply_result_to_chunk_extra(
         protocol_version,
         &apply_result.new_root,
         outcome_root,
+        apply_result.contract_changes_root(),
         apply_result.validator_proposals,
         apply_result.total_gas_burnt,
         chunk.gas_limit(),
