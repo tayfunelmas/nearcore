@@ -15,6 +15,7 @@ use near_epoch_manager::EpochManagerAdapter;
 use near_primitives::apply::ApplyChunkReason;
 use near_primitives::block::{Block, Tip};
 use near_primitives::block_header::BlockHeader;
+use near_primitives::contract_distribution::ChunkContractChanges;
 use near_primitives::epoch_block_info::BlockInfo;
 use near_primitives::hash::CryptoHash;
 use near_primitives::shard_layout::ShardUId;
@@ -155,6 +156,17 @@ impl<'a> ChainUpdate<'a> {
                         shard_id,
                         apply_result.proof,
                         apply_result.applied_receipts_hash,
+                    );
+                }
+
+                if let Some(contract_changes) = apply_result.contract_changes {
+                    let chunk_headers = block.chunks();
+                    let chunk_header =
+                        chunk_headers.iter().filter(|c| c.shard_id() == shard_id).next().unwrap();
+                    self.chain_store_update.save_chunk_contract_changes(
+                        *block_hash,
+                        shard_uid,
+                        ChunkContractChanges::new(epoch_id, chunk_header, contract_changes),
                     );
                 }
             }

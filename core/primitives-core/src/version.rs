@@ -250,10 +250,9 @@ impl ProtocolFeature {
             ProtocolFeature::NonrefundableStorage => 140,
             // TODO(#11201): When stabilizing this feature in mainnet, also remove the temporary code
             // that always enables this for mocknet (see config_mocknet function).
-            ProtocolFeature::ExcludeContractCodeFromStateWitness
             ProtocolFeature::ShuffleShardAssignments => 143,
             ProtocolFeature::SimpleNightshadeV4 => 145,
-            ProtocolFeature::ShuffleShardAssignments => 146,
+            ProtocolFeature::ExcludeContractCodeFromStateWitness => 146,
         }
     }
 
