@@ -198,7 +198,7 @@ impl PrepareBenchmarkCmd {
         }
 
         trie_update.commit(StateChangeCause::UpdatedDelayedReceipts);
-        let (_, trie_changes, _) = trie_update.finalize().unwrap();
+        let (_, trie_changes, _, _) = trie_update.finalize().unwrap();
 
         let mut store_update = tries.store_update();
         let new_state_root = tries.apply_all(&trie_changes, shard_uid, &mut store_update);

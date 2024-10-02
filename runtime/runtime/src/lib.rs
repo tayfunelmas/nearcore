@@ -2049,11 +2049,7 @@ impl Runtime {
         metrics::CHUNK_RECORDED_SIZE_UPPER_BOUND
             .with_label_values(&[shard_id_str.as_str()])
             .observe(chunk_recorded_size_upper_bound);
-        // TODO(#11099): Check protocol version for this.
-        let contract_changes = Some(state_update.get_contract_changes());
-        // TODO(#11099): Debugging only, remove this.
-        tracing::info!(target: "code-distribution", changes=?contract_changes.as_ref().unwrap().0.len(), "Contract changes into apply-chunk results");
-        let (trie, trie_changes, state_changes) = state_update.finalize()?;
+        let (trie, trie_changes, state_changes, contract_changes) = state_update.finalize()?;
 
         if let Some(prefetcher) = &processing_state.prefetcher {
             // Only clear the prefetcher queue after finalize is done because as part of receipt
@@ -2094,6 +2090,9 @@ impl Runtime {
         let proof = trie.recorded_storage();
         let processed_delayed_receipts = process_receipts_result.processed_delayed_receipts;
         let processed_yield_timeouts = promise_yield_result.processed_yield_timeouts;
+        let contract_changes = ProtocolFeature::ExcludeContractCodeFromStateWitness
+            .enabled(processing_state.protocol_version)
+            .then_some(contract_changes);
         Ok(ApplyResult {
             state_root,
             trie_changes,
@@ -2195,7 +2194,8 @@ fn missing_chunk_apply_result(
     delayed_receipts: &DelayedReceiptQueueWrapper,
     processing_state: ApplyProcessingState,
 ) -> Result<ApplyResult, RuntimeError> {
-    let (trie, trie_changes, state_changes) = processing_state.state_update.finalize()?;
+    let (trie, trie_changes, state_changes, contract_changes) =
+        processing_state.state_update.finalize()?;
     let proof = trie.recorded_storage();
 
     // For old chunks, copy the congestion info exactly as it came in,
@@ -2206,6 +2206,11 @@ fn missing_chunk_apply_result(
         .congestion_info
         .get(&processing_state.apply_state.shard_id)
         .map(|extended_info| extended_info.congestion_info);
+
+    // For old chunks, there is no contract code update, so place an empty list.
+    let contract_changes = ProtocolFeature::ExcludeContractCodeFromStateWitness
+        .enabled(processing_state.protocol_version)
+        .then_some(contract_changes);
 
     return Ok(ApplyResult {
         state_root: trie_changes.new_root,
@@ -2221,8 +2226,7 @@ fn missing_chunk_apply_result(
         delayed_receipts_count: delayed_receipts.len(),
         metrics: None,
         congestion_info,
-        // TODO(#11099): Check protocol version for this.
-        contract_changes: Some(ContractChanges::default()),
+        contract_changes,
     });
 }
 

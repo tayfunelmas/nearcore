@@ -484,7 +484,7 @@ mod tests {
         }
         trie_update
             .commit(StateChangeCause::TransactionProcessing { tx_hash: CryptoHash::default() });
-        let (_, trie_changes, state_changes) = trie_update.finalize().unwrap();
+        let (_, trie_changes, state_changes, _) = trie_update.finalize().unwrap();
         let mut store_update = tries.store_update();
         tries.apply_insertions(&trie_changes, shard_uid, &mut store_update);
         store_update.store_update().merge(

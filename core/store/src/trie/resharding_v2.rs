@@ -123,7 +123,7 @@ impl ShardTries {
         let mut new_state_roots = HashMap::new();
         let mut store_update = self.store_update();
         for (shard_uid, update) in updates {
-            let (_, trie_changes, state_changes) = update.finalize()?;
+            let (_, trie_changes, state_changes, _) = update.finalize()?;
             let state_root = self.apply_all(&trie_changes, shard_uid, &mut store_update);
             FlatStateChanges::from_state_changes(&state_changes)
                 .apply_to_flat_state(&mut store_update.flat_store_update(), shard_uid);
@@ -463,7 +463,7 @@ mod tests {
             delayed_receipt_indices.next_available_index = all_receipts.len() as u64;
             set(&mut trie_update, TrieKey::DelayedReceiptIndices, &delayed_receipt_indices);
             trie_update.commit(StateChangeCause::ReshardingV2);
-            let (_, trie_changes, _) = trie_update.finalize().unwrap();
+            let (_, trie_changes, _, _) = trie_update.finalize().unwrap();
             let mut store_update = tries.store_update();
             let state_root =
                 tries.apply_all(&trie_changes, ShardUId::single_shard(), &mut store_update);
@@ -518,7 +518,7 @@ mod tests {
             promise_yield_indices.next_available_index = all_timeouts.len() as u64;
             set(&mut trie_update, TrieKey::PromiseYieldIndices, &promise_yield_indices);
             trie_update.commit(StateChangeCause::ReshardingV2);
-            let (_, trie_changes, _) = trie_update.finalize().unwrap();
+            let (_, trie_changes, _, _) = trie_update.finalize().unwrap();
             let mut store_update = tries.store_update();
             let state_root =
                 tries.apply_all(&trie_changes, ShardUId::single_shard(), &mut store_update);

@@ -102,6 +102,9 @@ pub struct ApplyChunkResult {
     /// should be set to None for chunks before the CongestionControl protocol
     /// version and Some otherwise.
     pub congestion_info: Option<CongestionInfo>,
+    /// Contract changes observed while applying the chunk.
+    /// If the separation of contract changes is enabled, this field is always
+    /// present (Some) but possibly containing an empty list of changes.
     pub contract_changes: Option<ContractChanges>,
 }
 

@@ -135,15 +135,12 @@ impl TrieUpdate {
                 .changes
                 .push(RawStateChange { cause: event.clone(), data: value });
         }
+        self.contract_storage.commit();
     }
 
     pub fn rollback(&mut self) {
         self.prospective.clear();
         self.contract_storage.rollback();
-    }
-
-    pub fn get_contract_changes(&self) -> ContractChanges {
-        self.contract_storage.get_contract_changes()
     }
 
     /// Prepare the accumulated state changes to be applied to the underlying storage.
@@ -164,7 +161,8 @@ impl TrieUpdate {
     )]
     pub fn finalize(
         self,
-    ) -> Result<(Trie, TrieChanges, Vec<RawStateChangesWithTrieKey>), StorageError> {
+    ) -> Result<(Trie, TrieChanges, Vec<RawStateChangesWithTrieKey>, ContractChanges), StorageError>
+    {
         assert!(self.prospective.is_empty(), "Finalize cannot be called with uncommitted changes.");
         let span = tracing::Span::current();
         let TrieUpdate { trie, committed, .. } = self;
@@ -186,7 +184,8 @@ impl TrieUpdate {
             span.record("mem_reads", iops_delta.mem_reads);
             span.record("db_reads", iops_delta.db_reads);
         }
-        Ok((trie, trie_changes, state_changes))
+        let contract_changes = self.contract_storage.finalize();
+        Ok((trie, trie_changes, state_changes, contract_changes))
     }
 
     /// Returns Error if the underlying storage fails
