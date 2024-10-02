@@ -2,9 +2,11 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use bytesize::ByteSize;
 use itertools::Itertools;
 use near_crypto::{PublicKey, Signature};
-use near_primitives_core::types::{BlockHeight, CodeBytes, CodeHash, MerkleHash, ShardId};
+use near_primitives_core::{
+    hash::{hash, CryptoHash},
+    types::{BlockHeight, CodeBytes, CodeHash, MerkleHash, ShardId},
+};
 use near_schema_checker_lib::ProtocolSchema;
-use std::io::Error;
 
 use crate::{
     merkle::merklize,
@@ -129,6 +131,26 @@ pub struct ContractChange {
     pub refcount_delta: u64,
 }
 
+impl ContractChange {
+    pub fn validate(&self) -> Option<String> {
+        if self.refcount_delta == 0 {
+            return Some("Refcount delta is zero".to_string());
+        }
+        if self.code_hash == CryptoHash::default() {
+            return Some("Code hash is set to default".to_string());
+        }
+        if let Some(code) = self.code.as_ref() {
+            if code.is_empty() {
+                return Some("Code is empty".to_string());
+            }
+            if hash(code) != self.code_hash {
+                return Some("Invalid code hash".to_string());
+            }
+        }
+        None
+    }
+}
+
 pub const MAX_UNCOMPRESSED_CONTRACT_CHANGES_SIZE: u64 =
     ByteSize::mib(if cfg!(feature = "test_features") { 512 } else { 64 }).0;
 pub const CONTRACT_CHANGES_COMPRESSION_LEVEL: i32 = 3;
@@ -165,7 +187,7 @@ impl SignedEncodedContractChanges {
     pub fn new(
         contract_changes: ChunkContractChanges,
         signer: &ValidatorSigner,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, std::io::Error> {
         let inner = EncodedContractChangesInner::new(contract_changes)?;
         let signature = signer.sign_contract_changes(&inner);
         Ok(Self { inner, signature })
@@ -197,7 +219,7 @@ pub struct EncodedContractChangesInner {
 }
 
 impl EncodedContractChangesInner {
-    fn new(contract_changes: ChunkContractChanges) -> Result<Self, Error> {
+    fn new(contract_changes: ChunkContractChanges) -> Result<Self, std::io::Error> {
         let (encoded_changes, _raw_size) = EncodedContractChanges::encode(&contract_changes)?;
         Ok(Self {
             metadata: contract_changes.metadata,
