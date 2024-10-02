@@ -4,14 +4,18 @@ use lru::LruCache;
 use near_primitives::{
     block::ChunksCollection,
     contract_distribution::{ChunkContractChanges, ContractChanges},
+    hash::CryptoHash,
     sharding::{ChunkHash, ShardChunkHeader},
     stateless_validation::ChunkProductionKey,
-    types::EpochId,
+    types::{EpochId, ShardId},
 };
 use near_store::{adapter::contract_store::ContractStoreAdapter, StoreUpdate};
 
 use crate::Client;
+use near_async::messaging::CanSend;
 use near_chain::Error;
+
+use super::actor::DistributeContractChangesRequest;
 
 #[derive(actix::Message, Debug)]
 #[rtype(result = "()")]
@@ -103,5 +107,10 @@ impl Client {
     ) -> Result<(), Error> {
         self.contract_changes_tracker.update(contract_changes)?;
         Ok(())
+    }
+
+    pub(crate) fn distribute_contract_changes(&self, block_hash: CryptoHash, shard_id: ShardId) {
+        self.contract_distribution_adapter
+            .send(DistributeContractChangesRequest { block_hash, shard_id });
     }
 }

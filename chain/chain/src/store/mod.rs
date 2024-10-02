@@ -1387,7 +1387,7 @@ pub struct ChainStoreUpdate<'a> {
     add_state_sync_infos: Vec<StateSyncInfo>,
     remove_state_sync_infos: Vec<CryptoHash>,
     challenged_blocks: HashSet<CryptoHash>,
-    chunk_contract_changes: HashMap<(CryptoHash, ShardUId), ChunkContractChanges>,
+    chunk_contract_changes: HashMap<(CryptoHash, ShardId), ChunkContractChanges>,
 }
 
 impl<'a> ChainStoreUpdate<'a> {
@@ -2022,10 +2022,10 @@ impl<'a> ChainStoreUpdate<'a> {
     pub fn save_chunk_contract_changes(
         &mut self,
         block_hash: CryptoHash,
-        shard_uid: ShardUId,
+        shard_id: ShardId,
         chunk_contract_changes: ChunkContractChanges,
     ) {
-        self.chunk_contract_changes.insert((block_hash, shard_uid), chunk_contract_changes);
+        self.chunk_contract_changes.insert((block_hash, shard_id), chunk_contract_changes);
     }
 
     pub fn add_block_to_catchup(&mut self, prev_hash: CryptoHash, block_hash: CryptoHash) {
@@ -2560,11 +2560,11 @@ impl<'a> ChainStoreUpdate<'a> {
             }
         }
 
-        for ((block_hash, shard_uid), chunk_contract_changes) in self.chunk_contract_changes.drain()
+        for ((block_hash, shard_id), chunk_contract_changes) in self.chunk_contract_changes.drain()
         {
             store_update.set_ser(
                 DBCol::ChunkContractChanges,
-                &get_block_shard_uid(&block_hash, &shard_uid),
+                &get_block_shard_id(&block_hash, shard_id),
                 &chunk_contract_changes,
             )?;
         }

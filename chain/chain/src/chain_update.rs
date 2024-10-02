@@ -165,7 +165,7 @@ impl<'a> ChainUpdate<'a> {
                         chunk_headers.iter().filter(|c| c.shard_id() == shard_id).next().unwrap();
                     self.chain_store_update.save_chunk_contract_changes(
                         *block_hash,
-                        shard_uid,
+                        shard_id,
                         ChunkContractChanges::new(epoch_id, chunk_header, contract_changes),
                     );
                 }

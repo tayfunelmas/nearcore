@@ -19,7 +19,7 @@ impl SynchronousContractDistributionAdapter {
 impl CanSend<DistributeContractChangesRequest> for SynchronousContractDistributionAdapter {
     fn send(&self, msg: DistributeContractChangesRequest) {
         let mut actor = self.0.lock().unwrap();
-        let _ = actor.handle_distribute_contract_changes(msg.contract_changes);
+        let _ = actor.handle_distribute_contract_changes(&msg.block_hash, msg.shard_id);
     }
 }
 

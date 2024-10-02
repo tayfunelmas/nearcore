@@ -15,6 +15,7 @@ use near_primitives::contract_distribution::{
     ChunkContractChanges, ContractChanges, SignedEncodedContractChanges,
 };
 use near_primitives::hash::{hash, CryptoHash};
+use near_primitives::types::ShardId;
 use near_store::adapter::contract_store::ContractStoreAdapter;
 use near_store::adapter::StoreAdapter;
 
@@ -40,7 +41,8 @@ impl Actor for ContractDistributionActor {}
 #[derive(actix::Message, Debug)]
 #[rtype(result = "()")]
 pub struct DistributeContractChangesRequest {
-    pub contract_changes: ChunkContractChanges,
+    pub block_hash: CryptoHash,
+    pub shard_id: ShardId,
 }
 
 #[derive(Clone, MultiSend, MultiSenderFrom)]
@@ -51,7 +53,7 @@ pub struct ContractDistributionSenderForClient {
 impl Handler<DistributeContractChangesRequest> for ContractDistributionActor {
     #[perf]
     fn handle(&mut self, msg: DistributeContractChangesRequest) {
-        if let Err(err) = self.handle_distribute_contract_changes(msg.contract_changes) {
+        if let Err(err) = self.handle_distribute_contract_changes(&msg.block_hash, msg.shard_id) {
             tracing::error!(target: "client", ?err, "Failed to handle DistributeContractChangesRequest");
         }
     }
@@ -78,9 +80,19 @@ impl ContractDistributionActor {
 
     pub fn handle_distribute_contract_changes(
         &mut self,
-        raw_changes: ChunkContractChanges,
+        block_hash: &CryptoHash,
+        shard_id: ShardId,
     ) -> Result<(), Error> {
-        let metadata = &raw_changes.metadata;
+        let Some(contract_changes) =
+            self.store.get_chunk_contract_changes(&block_hash, shard_id)?
+        else {
+            return Err(Error::Other(format!(
+                "ChunkContractChanges not found for block {:?} and shard {}",
+                block_hash, shard_id
+            )));
+        };
+
+        let metadata = &contract_changes.metadata;
 
         tracing::debug!(target: "client", epoch_id=?metadata.epoch_id, shard_id=?metadata.shard_id, height=?metadata.height_created, "distribute_contract_changes");
 
@@ -98,7 +110,7 @@ impl ContractDistributionActor {
             .map(|vs| vs.account_id().clone())
             .collect_vec();
 
-        let encoded_changes = SignedEncodedContractChanges::new(raw_changes, &signer)?;
+        let encoded_changes = SignedEncodedContractChanges::new(contract_changes, &signer)?;
 
         self.network_adapter.send(PeerManagerMessageRequest::NetworkRequests(
             NetworkRequests::ContractChanges(validators, encoded_changes),

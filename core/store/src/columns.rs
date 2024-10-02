@@ -305,7 +305,7 @@ pub enum DBCol {
     /// - *Column type*: Vec<u8> (code)
     ContractCode,
     /// Column to store contract code before being committed.
-    /// - *Rows*: BlockChunk (block_hash, shard_uid)
+    /// - *Rows*: BlockChunk (block_hash, shard_id)
     /// - *Content type*: ChunkContractChanges
     ChunkContractChanges,
 }
@@ -590,7 +590,7 @@ impl DBCol {
             DBCol::LatestWitnessesByIndex => &[DBKeyType::LatestWitnessIndex],
             DBCol::EpochSyncProof => &[DBKeyType::Empty],
             DBCol::ContractCode => &[DBKeyType::CodeHash],
-            DBCol::ChunkContractChanges => &[DBKeyType::BlockHash, DBKeyType::ShardUId],
+            DBCol::ChunkContractChanges => &[DBKeyType::BlockHash, DBKeyType::ShardId],
         }
     }
 }

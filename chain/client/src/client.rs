@@ -1849,6 +1849,15 @@ impl Client {
                     ) {
                         tracing::error!(target: "client", ?err, "Failed to send chunk state witness to chunk validators");
                     }
+                    let protocol_version = self
+                        .epoch_manager
+                        .get_epoch_protocol_version(&epoch_id)
+                        .expect("Epoch info should be ready at this point");
+                    if ProtocolFeature::ExcludeContractCodeFromStateWitness
+                        .enabled(protocol_version)
+                    {
+                        self.distribute_contract_changes(*block.hash(), shard_id);
+                    }
                 }
                 Ok(None) => {}
                 Err(err) => {

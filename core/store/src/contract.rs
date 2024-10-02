@@ -16,9 +16,9 @@ struct ContractCodeWithRefcount {
     refcount_delta: u64,
 }
 
-impl ContractCodeWithRefcount {
-    fn new(code: Option<ContractCode>) -> Self {
-        Self { code, refcount_delta: 0 }
+impl From<ContractCode> for ContractCodeWithRefcount {
+    fn from(code: ContractCode) -> Self {
+        Self { code: Some(code), refcount_delta: 0 }
     }
 }
 
@@ -42,10 +42,7 @@ impl UncommittedContractChanges {
                 }
                 changes
             }
-            Entry::Vacant(v) => v.insert(ContractCodeWithRefcount::new(Some(ContractCode::new(
-                code.code().to_vec(),
-                Some(*code.hash()),
-            )))),
+            Entry::Vacant(v) => v.insert(code.into()),
         };
         changes.refcount_delta += 1;
     }
@@ -54,7 +51,7 @@ impl UncommittedContractChanges {
         let mut guard = self.0.write().expect("no panics");
         let changes = match guard.as_mut().unwrap().entry(*code_hash) {
             Entry::Occupied(o) => o.into_mut(),
-            Entry::Vacant(v) => v.insert(ContractCodeWithRefcount::new(None)),
+            Entry::Vacant(v) => v.insert(ContractCodeWithRefcount::default()),
         };
         changes.refcount_delta -= 1;
     }

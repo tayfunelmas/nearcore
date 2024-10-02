@@ -2,8 +2,8 @@ use crate::{DBCol, Store, StoreAdapter, StoreUpdate, StoreUpdateAdapter};
 use near_primitives::contract_distribution::{ChunkContractChanges, ContractChanges};
 use near_primitives::errors::{MissingTrieValueContext, StorageError};
 use near_primitives::hash::CryptoHash;
-use near_primitives::shard_layout::{get_block_shard_uid, ShardUId};
-use near_primitives::types::{CodeBytes, CodeHash};
+use near_primitives::types::{CodeBytes, CodeHash, ShardId};
+use near_primitives::utils::get_block_shard_id;
 use std::io;
 use std::num::NonZero;
 use std::sync::Arc;
@@ -30,6 +30,16 @@ impl ContractStoreAdapter {
         ContractStoreUpdateAdapter {
             store_update: StoreUpdateHolder::Owned(self.store.store_update()),
         }
+    }
+
+    pub fn get_chunk_contract_changes(
+        &self,
+        block_hash: &CryptoHash,
+        shard_id: ShardId,
+    ) -> Result<Option<ChunkContractChanges>, StorageError> {
+        self.store
+            .get_ser(DBCol::ChunkContractChanges, &get_block_shard_id(block_hash, shard_id))
+            .map_err(|_| StorageError::StorageInternalError)
     }
 
     pub fn get(&self, code_hash: &CodeHash) -> Result<Arc<CodeBytes>, StorageError> {
@@ -63,19 +73,6 @@ impl ContractStoreUpdateAdapter<'static> {
 
     pub fn save_block_contract_changes(&self, _changes: ContractChanges) -> io::Result<()> {
         unimplemented!("TODO(#11099): Implement this.")
-    }
-
-    pub fn save_chunk_contract_changes(
-        &mut self,
-        block_hash: &CryptoHash,
-        shard_uid: &ShardUId,
-        changes: &ChunkContractChanges,
-    ) -> io::Result<()> {
-        self.store_update().set_ser(
-            DBCol::ChunkContractChanges,
-            &get_block_shard_uid(block_hash, shard_uid),
-            &changes,
-        )
     }
 }
 
