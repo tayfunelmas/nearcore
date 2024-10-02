@@ -42,7 +42,7 @@ impl ContractStoreAdapter {
             .map_err(|_| StorageError::StorageInternalError)
     }
 
-    pub fn get(&self, code_hash: &CodeHash) -> Result<Arc<CodeBytes>, StorageError> {
+    pub fn get_contract_code(&self, code_hash: &CodeHash) -> Result<Arc<CodeBytes>, StorageError> {
         let val = self
             .store
             .get(DBCol::ContractCode, code_hash.as_ref())
@@ -73,6 +73,19 @@ impl ContractStoreUpdateAdapter<'static> {
 
     pub fn save_block_contract_changes(&self, _changes: ContractChanges) -> io::Result<()> {
         unimplemented!("TODO(#11099): Implement this.")
+    }
+
+    pub fn save_chunk_contract_changes(
+        &mut self,
+        block_hash: &CryptoHash,
+        shard_id: ShardId,
+        chunk_contract_changes: &ChunkContractChanges,
+    ) -> io::Result<()> {
+        self.store_update.set_ser(
+            DBCol::ChunkContractChanges,
+            &get_block_shard_id(block_hash, shard_id),
+            &chunk_contract_changes,
+        )
     }
 }
 

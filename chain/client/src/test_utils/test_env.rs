@@ -482,7 +482,7 @@ impl TestEnv {
                     for receiver in receivers.into_iter() {
                         let (changes, _) = signed_encoded_changes.decode().unwrap();
                         let processing_result =
-                            self.client(&receiver).process_contract_changes(changes);
+                            self.client(&receiver).on_contract_changes_received(changes);
                         if !allow_errors {
                             processing_result.unwrap();
                         }

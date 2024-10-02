@@ -2234,7 +2234,7 @@ impl Handler<ChunkEndorsementMessage> for ClientActorInner {
 impl Handler<ContractChangesMessage> for ClientActorInner {
     #[perf]
     fn handle(&mut self, msg: ContractChangesMessage) {
-        if let Err(err) = self.client.process_contract_changes(msg.0) {
+        if let Err(err) = self.client.on_contract_changes_received(msg.0) {
             tracing::error!(target: "client", ?err, "Error processing contract changes");
         }
     }

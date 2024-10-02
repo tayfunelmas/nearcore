@@ -10,7 +10,6 @@ use near_schema_checker_lib::ProtocolSchema;
 
 use crate::{
     merkle::merklize,
-    sharding::{ChunkHash, ShardChunkHeader},
     stateless_validation::{ChunkProductionKey, SignatureDifferentiator},
     types::EpochId,
     utils::compression::CompressedData,
@@ -21,12 +20,12 @@ use crate::{
 pub struct ContractChangesMetadata {
     /// Epoch ID in which the chunk is created.
     pub epoch_id: EpochId,
+    /// Block hash at which this chunk is included (applied).
+    pub block_hash: CryptoHash,
     /// Block height at which this chunk is created.
     pub height_created: BlockHeight,
     /// Shard ID of the chunk.
     pub shard_id: ShardId,
-    // Hash of the chunk.
-    pub chunk_hash: ChunkHash,
 }
 
 impl ContractChangesMetadata {
@@ -36,10 +35,6 @@ impl ContractChangesMetadata {
             epoch_id: self.epoch_id,
             height_created: self.height_created,
         }
-    }
-
-    pub fn chunk_hash(&self) -> &ChunkHash {
-        &self.chunk_hash
     }
 }
 
@@ -52,15 +47,12 @@ pub struct ChunkContractChanges {
 impl ChunkContractChanges {
     pub fn new(
         epoch_id: EpochId,
-        chunk_header: &ShardChunkHeader,
+        block_hash: CryptoHash,
+        height_created: BlockHeight,
+        shard_id: ShardId,
         changes: ContractChanges,
     ) -> Self {
-        let metadata = ContractChangesMetadata {
-            epoch_id,
-            height_created: chunk_header.height_created(),
-            shard_id: chunk_header.shard_id(),
-            chunk_hash: chunk_header.chunk_hash(),
-        };
+        let metadata = ContractChangesMetadata { epoch_id, block_hash, height_created, shard_id };
         Self { metadata, changes }
     }
 

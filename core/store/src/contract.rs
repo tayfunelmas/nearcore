@@ -168,6 +168,6 @@ impl ContractStorage {
 
 impl TrieStorage for ContractStorage {
     fn retrieve_raw_bytes(&self, hash: &CryptoHash) -> Result<Arc<[u8]>, StorageError> {
-        self.store.get(hash).map(|code| Arc::from(code.as_slice()))
+        self.store.get_contract_code(hash).map(|code| Arc::from(code.as_slice()))
     }
 }

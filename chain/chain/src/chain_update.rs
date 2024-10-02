@@ -24,6 +24,7 @@ use near_primitives::state_sync::{ReceiptProofResponse, ShardStateSyncResponseHe
 use near_primitives::types::chunk_extra::ChunkExtra;
 use near_primitives::types::{BlockExtra, BlockHeight, BlockHeightDelta, ShardId};
 use near_primitives::views::LightClientBlockView;
+use near_store::adapter::StoreAdapter;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
@@ -159,16 +160,24 @@ impl<'a> ChainUpdate<'a> {
                         apply_result.applied_receipts_hash,
                     );
                 }
-
                 if let Some(contract_changes) = apply_result.contract_changes {
                     let chunk_headers = block.chunks();
                     let chunk_header =
                         chunk_headers.iter().filter(|c| c.shard_id() == shard_id).next().unwrap();
-                    self.chain_store_update.save_chunk_contract_changes(
-                        *block_hash,
+                    let mut store_update =
+                        self.chain_store_update.store().contract_store().store_update();
+                    store_update.save_chunk_contract_changes(
+                        block_hash,
                         shard_id,
-                        ChunkContractChanges::new(epoch_id, chunk_header, contract_changes),
-                    );
+                        &ChunkContractChanges::new(
+                            epoch_id,
+                            *block_hash,
+                            chunk_header.height_created(),
+                            chunk_header.shard_id(),
+                            contract_changes,
+                        ),
+                    )?;
+                    self.chain_store_update.merge(store_update.into());
                 }
             }
             ShardUpdateResult::OldChunk(OldChunkResult { shard_uid, apply_result }) => {
