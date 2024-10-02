@@ -173,6 +173,8 @@ pub enum ProtocolFeature {
     /// Store receipts in State in the StateStoredReceipt format.
     StateStoredReceipt,
     ExcludeContractCodeFromStateWitness,
+    /// Resharding V3
+    SimpleNightshadeV4,
 }
 
 impl ProtocolFeature {
@@ -249,7 +251,9 @@ impl ProtocolFeature {
             // TODO(#11201): When stabilizing this feature in mainnet, also remove the temporary code
             // that always enables this for mocknet (see config_mocknet function).
             ProtocolFeature::ExcludeContractCodeFromStateWitness
-            | ProtocolFeature::ShuffleShardAssignments => 143,
+            ProtocolFeature::ShuffleShardAssignments => 143,
+            ProtocolFeature::SimpleNightshadeV4 => 145,
+            ProtocolFeature::ShuffleShardAssignments => 146,
         }
     }
 
@@ -262,7 +266,7 @@ impl ProtocolFeature {
 const STABLE_PROTOCOL_VERSION: ProtocolVersion = 72;
 
 // On nightly, pick big enough version to support all features.
-const NIGHTLY_PROTOCOL_VERSION: ProtocolVersion = 145;
+const NIGHTLY_PROTOCOL_VERSION: ProtocolVersion = 146;
 
 /// Largest protocol version supported by the current binary.
 pub const PROTOCOL_VERSION: ProtocolVersion = if cfg!(feature = "nightly_protocol") {
