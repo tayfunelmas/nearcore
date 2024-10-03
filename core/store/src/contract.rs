@@ -131,9 +131,11 @@ impl ContractStorageUpdate {
         if let Some(v) = self.uncommitted_changes.get(&code_hash) {
             return Ok(Some(ContractCode::new(v.code().to_vec(), Some(code_hash))));
         }
-        self.storage
-            .retrieve_raw_bytes(&code_hash)
-            .map(|raw_code| Some(ContractCode::new(raw_code.to_vec(), Some(code_hash))))
+        match self.storage.retrieve_raw_bytes(&code_hash) {
+            Ok(code) => Ok(Some(ContractCode::new(code.to_vec(), Some(code_hash)))),
+            Err(StorageError::MissingTrieValue(_, _)) => Ok(None),
+            Err(err) => Err(err),
+        }
     }
 
     pub(crate) fn store(&self, code: ContractCode) {
