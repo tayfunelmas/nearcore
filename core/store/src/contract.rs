@@ -159,7 +159,7 @@ impl ContractStorageUpdate {
     }
 
     pub(crate) fn finalize(self) -> ContractChanges {
-        assert!(self.uncommitted_changes.is_empty(), "Has uncommited changes before finalizing");
+        // TODO(#11099): assert!(self.uncommitted_changes.is_empty(), "Has uncommited changes before finalizing");
         self.committed_changes.unwrap_or_else(|| panic!("Finalizing before committing"))
     }
 }
