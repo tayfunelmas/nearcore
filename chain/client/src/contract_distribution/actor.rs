@@ -83,9 +83,7 @@ impl ContractDistributionActor {
         block_hash: &CryptoHash,
         shard_id: ShardId,
     ) -> Result<(), Error> {
-        let Some(contract_changes) =
-            self.store.get_chunk_contract_changes(&block_hash, shard_id)?
-        else {
+        let Some(changes) = self.store.get_chunk_contract_changes(&block_hash, shard_id)? else {
             tracing::error!(target: "code-dist", ?block_hash, shard_id, "Failed to find chunk contract changes when handling distribute changes request");
             return Err(Error::Other(format!(
                 "ChunkContractChanges not found for block {:?} and shard {}",
@@ -93,9 +91,16 @@ impl ContractDistributionActor {
             )));
         };
 
+        if let Err(error) = changes.inner().validate() {
+            return Err(Error::InvalidContractChanges(format!(
+                "Invalid contract changes: {:?}",
+                error
+            )));
+        }
+
         tracing::trace!(target: "code-dist", ?block_hash, shard_id, "Actor signing and encoding chunk contract changes");
 
-        let metadata = &contract_changes.metadata;
+        let metadata = &changes.metadata;
         let validators = self
             .epoch_manager
             .get_epoch_all_validators(&metadata.epoch_id)?
@@ -109,7 +114,7 @@ impl ContractDistributionActor {
                 return Err(Error::NotAValidator(format!("distribute contract changes")));
             }
         };
-        let encoded_changes = SignedEncodedContractChanges::new(contract_changes, &signer)?;
+        let encoded_changes = SignedEncodedContractChanges::new(changes, &signer)?;
 
         tracing::trace!(target: "code-dist", ?block_hash, shard_id, ?validators, "Actor distributing chunk contract changes to validators");
         self.network_adapter.send(PeerManagerMessageRequest::NetworkRequests(
@@ -147,10 +152,10 @@ impl ContractDistributionActor {
         let (changes, _size) = signed_encoded_changes.decode()?;
         tracing::trace!(target: "code-dist", num_changes=changes.inner().0.len(), "Actor decoded received SignedEncodedContractChanges");
 
-        if let Some(errors) = changes.inner().validate() {
+        if let Err(error) = changes.inner().validate() {
             return Err(Error::InvalidContractChanges(format!(
-                "Invalid contract changes. Errors: {:?}",
-                errors
+                "Invalid contract changes: {:?}",
+                error
             )));
         }
 

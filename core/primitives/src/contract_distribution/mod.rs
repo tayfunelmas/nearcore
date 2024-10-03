@@ -1,5 +1,6 @@
 use std::num::NonZeroI32;
 
+use anyhow::anyhow;
 use borsh::{BorshDeserialize, BorshSerialize};
 use bytesize::ByteSize;
 use itertools::Itertools;
@@ -108,14 +109,11 @@ impl ContractChanges {
             .then(|| MerkleHash::default())
     }
 
-    pub fn validate(&self) -> Option<Vec<String>> {
-        let mut errors = vec![];
+    pub fn validate(&self) -> anyhow::Result<()> {
         for change in self.0.iter() {
-            if let Some(e) = change.validate() {
-                errors.extend(e.into_iter());
-            }
+            change.validate()?;
         }
-        errors.is_empty().then_some(errors)
+        Ok(())
     }
 }
 
@@ -140,23 +138,22 @@ impl ContractChange {
         Self { code_hash, code, refcount_delta }
     }
 
-    pub fn validate(&self) -> Option<Vec<String>> {
-        let mut errors = vec![];
+    pub fn validate(&self) -> anyhow::Result<()> {
         if self.code_hash == CodeHash::default() {
-            errors.push("Code hash is set to default".to_string());
+            return Err(anyhow!("Code hash is set to default"));
         }
         if let Some(code) = self.code.as_ref() {
             if code.is_empty() {
-                errors.push("Code is empty".to_string());
+                return Err(anyhow!("Code is empty"));
             }
             if hash(code) != self.code_hash {
-                errors.push("Invalid code hash".to_string());
+                return Err(anyhow!("Invalid code hash"));
             }
         }
         if self.refcount_delta.is_positive() && self.code.is_none() {
-            errors.push("Refcount delta is positive but code is not present".to_string());
+            return Err(anyhow!("Refcount delta is positive but code is not present"));
         }
-        errors.is_empty().then_some(errors)
+        Ok(())
     }
 
     pub fn code_hash(&self) -> &CodeHash {

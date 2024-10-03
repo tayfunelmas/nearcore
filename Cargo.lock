@@ -4718,6 +4718,7 @@ dependencies = [
 name = "near-primitives"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "arbitrary",
  "assert_matches",
  "base64 0.21.0",
