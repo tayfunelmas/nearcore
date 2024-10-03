@@ -158,12 +158,12 @@ impl ShardChunkHeaderInner {
 
     /// Contract changes, if the feature is enabled on the chunk, `None`` otherwise.
     #[inline]
-    pub fn contract_changes_root(&self) -> Option<MerkleHash> {
+    pub fn prev_contract_changes_root(&self) -> Option<MerkleHash> {
         match self {
             Self::V1(_) => None,
             Self::V2(_) => None,
             Self::V3(_) => None,
-            Self::V4(inner) => Some(inner.contract_changes_root),
+            Self::V4(inner) => Some(inner.prev_contract_changes_root),
         }
     }
 }
@@ -278,5 +278,5 @@ pub struct ShardChunkHeaderInnerV4 {
     /// Congestion info about this shard after the previous chunk was applied.
     pub congestion_info: CongestionInfo,
     /// Contract changes root after the previous chunk was applied.
-    pub contract_changes_root: MerkleHash,
+    pub prev_contract_changes_root: MerkleHash,
 }

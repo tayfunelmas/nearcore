@@ -71,7 +71,7 @@ impl ContractStoreUpdateAdapter<'static> {
         store_update.commit()
     }
 
-    pub fn save_block_contract_changes(&self, _changes: ContractChanges) -> io::Result<()> {
+    pub fn save_block_contract_changes(&self, _changes: &ContractChanges) -> io::Result<()> {
         unimplemented!("TODO(#11099): Implement this.")
     }
 
@@ -86,6 +86,11 @@ impl ContractStoreUpdateAdapter<'static> {
             &get_block_shard_id(block_hash, shard_id),
             &chunk_contract_changes,
         )
+    }
+
+    pub fn delete_chunk_contract_changes(&mut self, block_hash: &CryptoHash, shard_id: ShardId) {
+        self.store_update
+            .delete(DBCol::ChunkContractChanges, &get_block_shard_id(block_hash, shard_id))
     }
 }
 

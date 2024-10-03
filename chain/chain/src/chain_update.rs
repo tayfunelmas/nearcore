@@ -22,7 +22,7 @@ use near_primitives::shard_layout::ShardUId;
 use near_primitives::sharding::ShardChunk;
 use near_primitives::state_sync::{ReceiptProofResponse, ShardStateSyncResponseHeader};
 use near_primitives::types::chunk_extra::ChunkExtra;
-use near_primitives::types::{BlockExtra, BlockHeight, BlockHeightDelta, ShardId};
+use near_primitives::types::{BlockExtra, BlockHeight, BlockHeightDelta, MerkleHash, ShardId};
 use near_primitives::views::LightClientBlockView;
 use near_store::adapter::StoreAdapter;
 use near_store::StoreUpdate;
@@ -291,7 +291,7 @@ impl<'a> ChainUpdate<'a> {
         self.chain_store_update.inc_block_refcount(prev_hash)?;
 
         if let Some(contract_updates) =
-            self.save_contract_changes_from_prev_chunks(block.chunks())?
+            self.save_contract_changes_from_prev_chunks(prev_hash, block.chunks())?
         {
             tracing::trace!(target: "code-dist", "ChainUpdate saving contract changes from previous block in postprocess_block");
             self.chain_store_update.merge(contract_updates.into());
@@ -691,43 +691,50 @@ impl<'a> ChainUpdate<'a> {
 
     fn save_contract_changes_from_prev_chunks(
         &self,
+        prev_hash: &CryptoHash,
         chunks: ChunksCollection,
     ) -> Result<Option<StoreUpdate>, Error> {
-        // let mut block_contract_changes = ContractChanges::default();
-        // for chunk_header in chunks.iter() {
-        //     let chunk_key = ChunkProductionKey {
-        //         epoch_id: *epoch_id,
-        //         height_created: chunk_header.height_created(),
-        //         shard_id: chunk_header.shard_id(),
-        //     };
-        //     let Some(cache_entry) = self.uncommitted_changes.pop(&chunk_key) else {
-        //         panic!("Failed to find contract changes for chunk production key: {:?}", chunk_key)
-        //     };
-        //     // Validate chunk hash and merkelized root before merging with others.
-        //     if let Err(error) = Self::validate_contract_changes(&cache_entry, chunk_header) {
-        //         tracing::error!("Failed to validate contract changes for chunk: {:#}", error);
-        //         continue;
-        //     }
+        let chain_store = self.chain_store_update.chain_store();
+        let contract_store = chain_store.store().contract_store();
 
-        //     block_contract_changes.merge_from(cache_entry.changes);
-        // }
-        let store_update = self.chain_store_update.store().contract_store().store_update();
-        // store_update.save_block_contract_changes(block_contract_changes)?;
-        Ok(Some(store_update.into()))
+        let prev_block = chain_store.get_block(prev_hash)?;
+
+        let mut store_update = None;
+        for chunk_header in chunks.iter() {
+            let prev_contract_changes_root =
+                chunk_header.prev_contract_changes_root().unwrap_or_default();
+            // If no changes existed in the previous chunk, skip it.
+            if prev_contract_changes_root == MerkleHash::default() {
+                continue;
+            }
+            let shard_id = chunk_header.shard_id();
+            let prev_height_included = prev_block.chunks()[shard_id as usize].height_included();
+            let prev_hash_included = chain_store.get_block_hash_by_height(prev_height_included)?;
+
+            let Some(chunk_contract_changes) =
+                contract_store.get_chunk_contract_changes(&prev_hash_included, shard_id)?
+            else {
+                tracing::error!(target: "code-dist", ?prev_hash_included, shard_id, "Failed to find chunk contract changes but merkle root is not default");
+                return Err(Error::Other(format!(
+                    "ChunkContractChanges not found for block {:?} and shard {}",
+                    prev_hash_included, shard_id
+                )));
+            };
+
+            // TODO(#11099): Validate the metadata in the contract changes against the chunk header.
+
+            let contract_changes = chunk_contract_changes.inner();
+            if contract_changes.merkle_root() != prev_contract_changes_root {
+                return Err(Error::InvalidContractChanges(
+                    "Invalid merkle root for contract changes in chunk header".to_string(),
+                ));
+            }
+
+            let store_update_inner =
+                store_update.get_or_insert_with(|| contract_store.store_update());
+            store_update_inner.save_block_contract_changes(contract_changes)?;
+            store_update_inner.delete_chunk_contract_changes(&prev_hash_included, shard_id);
+        }
+        Ok(store_update.map(|update| update.into()))
     }
-
-    // fn validate_contract_changes(
-    //     cache_entry: &ContractChangesCacheEntry,
-    //     chunk_header: &ShardChunkHeader,
-    // ) -> Result<(), Error> {
-    //     if cache_entry.chunk_hash != chunk_header.chunk_hash() {
-    //         return Err(Error::InvalidContractChanges("Invalid chunk hash".to_string()));
-    //     }
-    //     if cache_entry.changes.merklize() != chunk_header.contract_changes_root().unwrap() {
-    //         return Err(Error::InvalidContractChanges(
-    //             "Invalid merkle root for contract changes".to_string(),
-    //         ));
-    //     }
-    //     Ok(())
-    // }
 }

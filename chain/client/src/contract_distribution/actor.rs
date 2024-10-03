@@ -158,7 +158,9 @@ impl ContractDistributionActor {
 
 fn validate_contract_changes(changes: &ContractChanges) -> Result<(), Error> {
     for change in changes.0.iter() {
-        change.validate().map_or(Ok(()), |err| Err(Error::InvalidContractChanges(err)))?;
+        change
+            .validate()
+            .map_or(Ok(()), |err| Err(Error::InvalidContractChanges(err.to_string())))?;
     }
     Ok(())
 }

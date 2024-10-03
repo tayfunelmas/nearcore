@@ -195,10 +195,10 @@ impl ShardChunkHeaderV3 {
         tx_root: CryptoHash,
         prev_validator_proposals: Vec<ValidatorStake>,
         congestion_info: Option<CongestionInfo>,
-        contract_changes_root: Option<CryptoHash>,
+        prev_contract_changes_root: Option<CryptoHash>,
         signer: &ValidatorSigner,
     ) -> Self {
-        let inner = if let Some(contract_changes_root) = contract_changes_root {
+        let inner = if let Some(prev_contract_changes_root) = prev_contract_changes_root {
             assert!(ProtocolFeature::ExcludeContractCodeFromStateWitness.enabled(protocol_version));
             let congestion_info = congestion_info
                 .unwrap_or_else(|| panic!("Congestion control must be launched before"));
@@ -217,7 +217,7 @@ impl ShardChunkHeaderV3 {
                 tx_root,
                 prev_validator_proposals,
                 congestion_info,
-                contract_changes_root,
+                prev_contract_changes_root,
             })
         } else if let Some(congestion_info) = congestion_info {
             assert!(ProtocolFeature::CongestionControl.enabled(protocol_version));
@@ -464,11 +464,11 @@ impl ShardChunkHeader {
 
     /// Contract changes, if the feature is enabled on the chunk, `None`` otherwise.
     #[inline]
-    pub fn contract_changes_root(&self) -> Option<MerkleHash> {
+    pub fn prev_contract_changes_root(&self) -> Option<MerkleHash> {
         match self {
             Self::V1(_) => None,
             Self::V2(_) => None,
-            Self::V3(header) => header.inner.contract_changes_root(),
+            Self::V3(header) => header.inner.prev_contract_changes_root(),
         }
     }
 
@@ -1096,7 +1096,7 @@ impl EncodedShardChunk {
         prev_outgoing_receipts: &[Receipt],
         prev_outgoing_receipts_root: CryptoHash,
         congestion_info: Option<CongestionInfo>,
-        contract_changes_root: Option<MerkleHash>,
+        prev_contract_changes_root: Option<MerkleHash>,
         signer: &ValidatorSigner,
         protocol_version: ProtocolVersion,
     ) -> Result<(Self, Vec<MerklePath>), std::io::Error> {
@@ -1170,7 +1170,7 @@ impl EncodedShardChunk {
                 tx_root,
                 prev_validator_proposals,
                 congestion_info,
-                contract_changes_root,
+                prev_contract_changes_root,
                 signer,
             );
             let chunk = EncodedShardChunkV2 { header: ShardChunkHeader::V3(header), content };

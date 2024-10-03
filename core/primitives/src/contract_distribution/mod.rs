@@ -138,19 +138,19 @@ pub struct ContractChange {
 }
 
 impl ContractChange {
-    pub fn validate(&self) -> Option<String> {
+    pub fn validate(&self) -> Option<&str> {
         if self.refcount_delta == 0 {
-            return Some("Refcount delta is zero".to_string());
+            return Some("Refcount delta is zero");
         }
         if self.code_hash == CodeHash::default() {
-            return Some("Code hash is set to default".to_string());
+            return Some("Code hash is set to default");
         }
         if let Some(code) = self.code.as_ref() {
             if code.is_empty() {
-                return Some("Code is empty".to_string());
+                return Some("Code is empty");
             }
             if hash(code) != self.code_hash {
-                return Some("Invalid code hash".to_string());
+                return Some("Invalid code hash");
             }
         }
         None
