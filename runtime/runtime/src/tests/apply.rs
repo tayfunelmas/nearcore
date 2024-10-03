@@ -1153,7 +1153,7 @@ fn test_main_storage_proof_size_soft_limit() {
     // Check that alice contract is present in storage proof and bob
     // contract is not.
     let partial_storage = apply_result.proof.unwrap();
-    let contract_storage = ContractStorage::new(tries.store().contract_store());
+    let contract_storage = ContractStorage::new(tries.store().contract_store(), None);
     let storage =
         Trie::from_recorded_storage(partial_storage, Some(Arc::new(contract_storage)), root, false);
     let code_key = TrieKey::ContractCode { account_id: alice_account() };

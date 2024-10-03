@@ -151,7 +151,7 @@ impl TrieIterationBenchmarkCmd {
         // matter as the shard layout doesn't change.
         let state_root = chunk_header.prev_state_root();
         let trie_storage = TrieDBStorage::new(store.trie_store(), shard_uid);
-        let contract_storage = ContractStorage::new(store.contract_store());
+        let contract_storage = ContractStorage::new(store.contract_store(), Some(shard_uid));
         let flat_storage_chunk_view = None;
         Trie::new(
             Arc::new(trie_storage),

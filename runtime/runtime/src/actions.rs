@@ -1287,7 +1287,7 @@ mod tests {
             &DeleteAccountAction { beneficiary_id: "bob".parse().unwrap() },
             ProtocolFeature::DeleteActionRestriction.protocol_version(),
         );
-        assert!(res.is_ok());
+        assert!(res.is_ok(), "{:?}", res.err());
         action_result
     }
 

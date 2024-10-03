@@ -103,7 +103,7 @@ impl StatePartsSubCommand {
         near_config: NearConfig,
         store: Store,
     ) {
-        let contract_storage = ContractStorage::new(store.contract_store());
+        let contract_storage = ContractStorage::new(store.contract_store(), None);
         let epoch_manager =
             EpochManager::new_arc_handle(store.clone(), &near_config.genesis.config);
         let shard_tracker = ShardTracker::new(

@@ -2231,7 +2231,7 @@ mod tests {
         trie2.get_impl(b"dog").unwrap();
         trie2.get_impl(b"horse").unwrap();
         let partial_storage = trie2.recorded_storage();
-        let contract_storage = ContractStorage::new(tries.store().contract_store());
+        let contract_storage = ContractStorage::new(tries.store().contract_store(), None);
 
         let trie3 = Trie::from_recorded_storage(
             partial_storage.unwrap(),

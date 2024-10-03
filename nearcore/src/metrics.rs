@@ -159,7 +159,7 @@ fn get_postponed_receipt_count_for_shard(
     let chunk_extra = chain_store.get_chunk_extra(block.hash(), &shard_uid)?;
     let state_root = chunk_extra.state_root();
     let trie_storage = TrieDBStorage::new(store.trie_store(), shard_uid);
-    let contract_storage = ContractStorage::new(store.contract_store());
+    let contract_storage = ContractStorage::new(store.contract_store(), Some(shard_uid));
     let flat_storage_chunk_view = None;
     let trie = Trie::new(
         Arc::new(trie_storage),

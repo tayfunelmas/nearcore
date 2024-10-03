@@ -453,7 +453,7 @@ impl PrefetchApi {
             self.shard_cache.clone(),
             self.prefetching.clone(),
         );
-        let contract_storage = ContractStorage::new(self.store.contract_store());
+        let contract_storage = ContractStorage::new(self.store.contract_store(), Some(shard_uid));
         let work_queue = self.work_queue_rx.clone();
         let metric_prefetch_sent =
             metrics::PREFETCH_SENT.with_label_values(&[&shard_uid.shard_id.to_string()]);

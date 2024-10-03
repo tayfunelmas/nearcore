@@ -1,6 +1,7 @@
 use near_primitives::contract_distribution::{ContractChange, ContractChanges};
-use near_primitives::errors::StorageError;
+use near_primitives::errors::{MissingTrieValueContext, StorageError};
 use near_primitives::hash::CryptoHash;
+use near_primitives::shard_layout::ShardUId;
 use near_primitives::types::CodeHash;
 use near_vm_runner::ContractCode;
 use std::collections::btree_map::Entry;
@@ -8,7 +9,8 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
 
 use crate::adapter::contract_store::ContractStoreAdapter;
-use crate::TrieStorage;
+use crate::adapter::StoreAdapter;
+use crate::{TrieDBStorage, TrieStorage};
 
 #[derive(Default)]
 struct ContractCodeWithRefcount {
@@ -24,6 +26,7 @@ impl From<ContractCode> for ContractCodeWithRefcount {
 
 #[derive(Clone)]
 pub struct UncommittedContractChanges(
+    // TODO(#11099): This is single-threaded (per shard), so remove RwLock.
     Arc<RwLock<Option<BTreeMap<CodeHash, ContractCodeWithRefcount>>>>,
 );
 
@@ -71,7 +74,8 @@ impl UncommittedContractChanges {
     fn take_changes(&self) -> ContractChanges {
         let mut changes = ContractChanges::default();
         let mut guard = self.0.write().expect("no panics");
-        for (code_hash, code_with_refcount) in guard.take().unwrap().into_iter() {
+        let existing_changes = guard.replace(BTreeMap::new()).expect("should always be present");
+        for (code_hash, code_with_refcount) in existing_changes.into_iter() {
             if code_with_refcount.refcount_delta != 0 {
                 changes.0.push(ContractChange::new(
                     code_hash,
@@ -81,6 +85,12 @@ impl UncommittedContractChanges {
             }
         }
         changes
+    }
+
+    fn is_empty(&self) -> bool {
+        // Note: We do not check the refcount but always return the code.
+        let guard = self.0.read().expect("no panics");
+        guard.as_ref().unwrap().is_empty()
     }
 }
 
@@ -127,26 +137,27 @@ impl ContractStorageUpdate {
     }
 
     pub(crate) fn store(&self, code: ContractCode) {
-        assert!(self.committed_changes.is_none(), "Cannot store after commit");
+        // TODO(#11099): assert!(self.committed_changes.is_none(), "Cannot store after commit");
         self.uncommitted_changes.record_deploy(code);
     }
 
     pub(crate) fn delete(&self, code_hash: &CodeHash) {
-        assert!(self.committed_changes.is_none(), "Cannot delete after commit");
+        // TODO(#11099): assert!(self.committed_changes.is_none(), "Cannot delete after commit");
         self.uncommitted_changes.record_delete(code_hash);
     }
 
     pub(crate) fn rollback(&mut self) {
         assert!(self.committed_changes.is_none(), "Cannot rollback after commit");
-        self.uncommitted_changes = UncommittedContractChanges::new();
+        let _ = self.uncommitted_changes.take_changes();
     }
 
     pub(crate) fn commit(&mut self) {
-        assert!(self.committed_changes.is_none(), "Already committed");
+        // TODO(#11099): assert!(self.committed_changes.is_none(), "Already committed");
         self.committed_changes = Some(self.uncommitted_changes.take_changes());
     }
 
     pub(crate) fn finalize(self) -> ContractChanges {
+        assert!(self.uncommitted_changes.is_empty(), "Has uncommited changes before finalizing");
         self.committed_changes.unwrap_or_else(|| panic!("Finalizing before committing"))
     }
 }
@@ -157,16 +168,38 @@ impl ContractStorageUpdate {
 #[derive(Clone)]
 pub struct ContractStorage {
     store: ContractStoreAdapter,
+    state_fallback: Option<Arc<TrieDBStorage>>,
 }
 
 impl ContractStorage {
-    pub fn new(store: ContractStoreAdapter) -> Self {
-        Self { store }
+    pub fn new(store: ContractStoreAdapter, shard_uid: Option<ShardUId>) -> Self {
+        let state_fallback =
+            shard_uid.map(|shard_uid| Arc::new(TrieDBStorage::new(store.trie_store(), shard_uid)));
+        Self { store, state_fallback }
     }
 }
 
 impl TrieStorage for ContractStorage {
     fn retrieve_raw_bytes(&self, hash: &CryptoHash) -> Result<Arc<[u8]>, StorageError> {
-        self.store.get_contract_code(hash).map(|code| Arc::from(code.as_slice()))
+        match self.store.get_contract_code(hash) {
+            Ok(code) => Ok(Arc::from(code.as_slice())),
+            Err(StorageError::MissingTrieValue(context, hash_from_error)) => {
+                if let Some(state_fallback) = self.state_fallback.as_ref() {
+                    match state_fallback.retrieve_raw_bytes(hash) {
+                        Ok(code) => Ok(code),
+                        Err(StorageError::MissingTrieValue(_, hash)) => {
+                            Err(StorageError::MissingTrieValue(
+                                MissingTrieValueContext::ContractStorage,
+                                hash,
+                            ))
+                        }
+                        Err(error) => Err(error),
+                    }
+                } else {
+                    Err(StorageError::MissingTrieValue(context, hash_from_error))
+                }
+            }
+            Err(error) => Err(error),
+        }
     }
 }

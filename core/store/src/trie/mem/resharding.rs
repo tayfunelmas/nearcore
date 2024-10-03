@@ -252,7 +252,7 @@ mod tests {
         let new_state_root = memtries.apply_memtrie_changes(1, &memtrie_changes);
 
         let entries = if new_state_root != StateRoot::default() {
-            let contract_storage = ContractStorage::new(shard_tries.store().contract_store());
+            let contract_storage = ContractStorage::new(shard_tries.store().contract_store(), None);
             let trie = Trie::new(
                 Arc::new(TrieMemoryPartialStorage::default()),
                 Arc::new(contract_storage),

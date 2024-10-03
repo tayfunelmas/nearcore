@@ -102,7 +102,7 @@ impl AnalyzeContractSizesCommand {
 
             let state_root = chunk_extra.state_root();
             let trie_storage = Arc::new(TrieDBStorage::new(store.trie_store(), shard_uid));
-            let contract_storage = ContractStorage::new(store.contract_store());
+            let contract_storage = ContractStorage::new(store.contract_store(), Some(shard_uid));
             let trie = Trie::new(trie_storage, Arc::new(contract_storage), *state_root, None);
 
             let mut iterator = trie.disk_iter().unwrap();

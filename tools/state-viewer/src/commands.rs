@@ -1100,7 +1100,7 @@ fn get_trie(store: TrieStoreAdapter, hash: CryptoHash, shard_id: u32, shard_vers
     let shard_uid = ShardUId { version: shard_version, shard_id };
     let trie_config: TrieConfig = Default::default();
     let shard_cache = TrieCache::new(&trie_config, shard_uid, true);
-    let contract_storage = ContractStorage::new(store.contract_store());
+    let contract_storage = ContractStorage::new(store.contract_store(), Some(shard_uid));
     let trie_storage = TrieCachingStorage::new(store, shard_cache, shard_uid, true, None);
     Trie::new(Arc::new(trie_storage), Arc::new(contract_storage), hash, None)
 }
@@ -1180,7 +1180,7 @@ pub(crate) fn contract_accounts(
         );
         // Use simple non-caching storage, we don't expect many duplicate lookups while iterating.
         let trie_storage = TrieDBStorage::new(store.trie_store(), shard_uid);
-        let contract_storage = ContractStorage::new(store.contract_store());
+        let contract_storage = ContractStorage::new(store.contract_store(), Some(shard_uid));
         // We don't need flat state to traverse all accounts.
         let flat_storage_chunk_view = None;
         Trie::new(
