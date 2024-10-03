@@ -185,6 +185,7 @@ impl TrieUpdate {
             span.record("db_reads", iops_delta.db_reads);
         }
         let contract_changes = self.contract_storage.finalize();
+        tracing::trace!(target: "code-dist", "TrieUpdate returning ChunkContractChanges from finalize, num-changes: {}", contract_changes.0.len());
         Ok((trie, trie_changes, state_changes, contract_changes))
     }
 

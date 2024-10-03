@@ -1193,6 +1193,7 @@ impl PeerManagerActor {
             }
             NetworkRequests::ContractChanges(validator_accounts, contract_changes) => {
                 for validator in validator_accounts {
+                    tracing::trace!(target: "code-dist", ?validator, "PeerManager forwarding ContractChanges as RoutedMessageBody::ContractChanges");
                     self.state.send_message_to_account(
                         &self.clock,
                         &validator,

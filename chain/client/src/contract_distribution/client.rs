@@ -15,11 +15,12 @@ pub struct ContractChangesMessage(pub ChunkContractChanges);
 
 impl Client {
     pub(crate) fn distribute_contract_changes(&self, block_hash: CryptoHash, shard_id: ShardId) {
-        tracing::trace!(target: "code-dist", "Client sending DistributeContractChangesRequest");
+        tracing::trace!(target: "code-dist", "Client sending DistributeContractChangesRequest to actor");
         self.contract_distribution_adapter
             .send(DistributeContractChangesRequest { block_hash, shard_id });
     }
 
+    // TODO(#11099): Move this to the contract distribution actor, instead of passing and doing in client.
     pub(crate) fn on_contract_changes_received(
         &mut self,
         changes: ChunkContractChanges,
@@ -27,7 +28,7 @@ impl Client {
         // Get the (block_hash, shard_id) pair to save the changes in DB.
         let block_hash = changes.metadata.block_hash;
         let shard_id = changes.metadata.shard_id;
-
+        tracing::trace!(target: "code-dist", "Client saving ChunkContractChanges to DB");
         let mut store_update = self.chain.chain_store.store().contract_store().store_update();
         store_update.save_chunk_contract_changes(&block_hash, shard_id, &changes)?;
         store_update.commit().map_err(|error| Error::Other(error.to_string()))

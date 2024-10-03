@@ -811,7 +811,7 @@ impl NetworkState {
                 None
             }
             RoutedMessageBody::ContractChanges(message) => {
-                tracing::trace!(target: "code-dist", "Received ContractChanges from network, forwarding to actor");
+                tracing::trace!(target: "code-dist", "Received ContractChanges from network, forwarding to actor as SignedEncodedContractChangesMessage");
                 self.contract_distribution_adapter
                     .send(SignedEncodedContractChangesMessage(message));
                 None

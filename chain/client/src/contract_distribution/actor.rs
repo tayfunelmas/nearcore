@@ -51,7 +51,7 @@ pub struct ContractDistributionSenderForClient {
 impl Handler<DistributeContractChangesRequest> for ContractDistributionActor {
     #[perf]
     fn handle(&mut self, msg: DistributeContractChangesRequest) {
-        tracing::trace!(target: "code-dist", "Actor handling DistributeContractChangesRequest");
+        tracing::trace!(target: "code-dist", "Actor handling received DistributeContractChangesRequest");
         if let Err(err) = self.handle_distribute_contract_changes(&msg.block_hash, msg.shard_id) {
             tracing::error!(target: "client", ?err, "Failed to handle DistributeContractChangesRequest");
         }
@@ -60,6 +60,7 @@ impl Handler<DistributeContractChangesRequest> for ContractDistributionActor {
 
 impl Handler<SignedEncodedContractChangesMessage> for ContractDistributionActor {
     fn handle(&mut self, msg: SignedEncodedContractChangesMessage) {
+        tracing::trace!(target: "code-dist", "Actor handling received SignedEncodedContractChangesMessage");
         if let Err(err) = self.handle_contract_changes_received(msg.0) {
             tracing::error!(target: "client", ?err, "Failed to handle ContractChangesMessage");
         }
@@ -85,7 +86,7 @@ impl ContractDistributionActor {
         let Some(contract_changes) =
             self.store.get_chunk_contract_changes(&block_hash, shard_id)?
         else {
-            tracing::error!(target: "code-dist", ?block_hash, shard_id, "Failed to find chunk contract changes");
+            tracing::error!(target: "code-dist", ?block_hash, shard_id, "Failed to find chunk contract changes when handling distribute changes request");
             return Err(Error::Other(format!(
                 "ChunkContractChanges not found for block {:?} and shard {}",
                 block_hash, shard_id
@@ -122,20 +123,11 @@ impl ContractDistributionActor {
         &mut self,
         signed_encoded_changes: SignedEncodedContractChanges,
     ) -> Result<(), Error> {
+        tracing::trace!(target: "code-dist", "Actor validating contents of received SignedEncodedContractChanges");
         let chunk_key = signed_encoded_changes.chunk_production_key();
-        let chunk_producer = self.epoch_manager.get_chunk_producer_info(
-            &chunk_key.epoch_id,
-            chunk_key.height_created,
-            chunk_key.shard_id,
-        )?;
-
-        if !signed_encoded_changes.verify(chunk_producer.public_key()) {
-            return Err(Error::InvalidSignature);
-        }
-
         if !validate_chunk_production_key(
             self.epoch_manager.as_ref(),
-            chunk_key,
+            chunk_key.clone(),
             // This node may not be a validator for the given chunk, so do not check it.
             None,
             &self.store.store(),
@@ -143,11 +135,21 @@ impl ContractDistributionActor {
             return Err(Error::InvalidContractChanges("Invalid chunk production key".to_string()));
         }
 
+        let chunk_producer = self.epoch_manager.get_chunk_producer_info(
+            &chunk_key.epoch_id,
+            chunk_key.height_created,
+            chunk_key.shard_id,
+        )?;
+        if !signed_encoded_changes.verify(chunk_producer.public_key()) {
+            return Err(Error::InvalidSignature);
+        }
+
         let (changes, _size) = signed_encoded_changes.decode()?;
+        tracing::trace!(target: "code-dist", num_changes=changes.inner().0.len(), "Actor decoded received SignedEncodedContractChanges");
 
         validate_contract_changes(changes.inner())?;
 
-        tracing::trace!(target: "code-dist", changes=?changes.inner(), "Received contract changes");
+        tracing::trace!(target: "code-dist", changes=?changes.inner(), "Actor forwarding decoded contract changes to Client");
         self.client_sender.send(ContractChangesMessage(changes));
 
         Ok(())

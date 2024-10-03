@@ -13,7 +13,7 @@ use crate::{Chain, Doomslug};
 use near_chain_primitives::error::Error;
 use near_epoch_manager::EpochManagerAdapter;
 use near_primitives::apply::ApplyChunkReason;
-use near_primitives::block::{Block, Tip};
+use near_primitives::block::{Block, ChunksCollection, Tip};
 use near_primitives::block_header::BlockHeader;
 use near_primitives::contract_distribution::ChunkContractChanges;
 use near_primitives::epoch_block_info::BlockInfo;
@@ -167,6 +167,7 @@ impl<'a> ChainUpdate<'a> {
                         chunk_headers.iter().filter(|c| c.shard_id() == shard_id).next().unwrap();
                     let mut store_update =
                         self.chain_store_update.store().contract_store().store_update();
+                    tracing::trace!(target: "code-dist", "ChainUpdate saving ChunkContractChanges after applying new chunk");
                     store_update.save_chunk_contract_changes(
                         block_hash,
                         shard_id,
@@ -289,8 +290,12 @@ impl<'a> ChainUpdate<'a> {
         self.chain_store_update.save_block(block.clone());
         self.chain_store_update.inc_block_refcount(prev_hash)?;
 
-        let contract_updates = self.save_contract_changes_from_prev_block()?;
-        self.chain_store_update.merge(contract_updates.into());
+        if let Some(contract_updates) =
+            self.save_contract_changes_from_prev_chunks(block.chunks())?
+        {
+            tracing::trace!(target: "code-dist", "ChainUpdate saving contract changes from previous block in postprocess_block");
+            self.chain_store_update.merge(contract_updates.into());
+        }
 
         // Update the chain head if it's the new tip
         let res = self.update_head(block.header())?;
@@ -684,7 +689,10 @@ impl<'a> ChainUpdate<'a> {
         Ok(true)
     }
 
-    fn save_contract_changes_from_prev_block(&self) -> Result<StoreUpdate, Error> {
+    fn save_contract_changes_from_prev_chunks(
+        &self,
+        chunks: ChunksCollection,
+    ) -> Result<Option<StoreUpdate>, Error> {
         // let mut block_contract_changes = ContractChanges::default();
         // for chunk_header in chunks.iter() {
         //     let chunk_key = ChunkProductionKey {
@@ -705,7 +713,7 @@ impl<'a> ChainUpdate<'a> {
         // }
         let store_update = self.chain_store_update.store().contract_store().store_update();
         // store_update.save_block_contract_changes(block_contract_changes)?;
-        Ok(store_update.into())
+        Ok(Some(store_update.into()))
     }
 
     // fn validate_contract_changes(

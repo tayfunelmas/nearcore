@@ -1850,6 +1850,7 @@ impl Client {
                     if ProtocolFeature::ExcludeContractCodeFromStateWitness
                         .enabled(protocol_version)
                     {
+                        tracing::trace!(target: "code-dist", "Client distributing contract changes on producing new chunk");
                         self.distribute_contract_changes(*block.hash(), shard_id);
                     }
                 }
