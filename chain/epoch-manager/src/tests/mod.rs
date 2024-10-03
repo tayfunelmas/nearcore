@@ -3288,9 +3288,7 @@ fn test_chunk_header(h: &[CryptoHash], signer: &ValidatorSigner) -> ShardChunkHe
     let congestion_info = ProtocolFeature::CongestionControl
         .enabled(PROTOCOL_VERSION)
         .then_some(CongestionInfo::default());
-    let contract_changes_root = ProtocolFeature::ExcludeContractCodeFromStateWitness
-        .enabled(PROTOCOL_VERSION)
-        .then_some(ContractChanges::default().merklize());
+    let contract_changes_root = ContractChanges::default_merkle_root(PROTOCOL_VERSION);
     ShardChunkHeader::V3(ShardChunkHeaderV3::new(
         PROTOCOL_VERSION,
         h[0],

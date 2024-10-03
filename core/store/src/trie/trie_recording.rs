@@ -351,9 +351,7 @@ mod trie_recording_tests {
         let congestion_info = ProtocolFeature::CongestionControl
             .enabled(PROTOCOL_VERSION)
             .then(CongestionInfo::default);
-        let contract_changes_root = ProtocolFeature::ExcludeContractCodeFromStateWitness
-            .enabled(PROTOCOL_VERSION)
-            .then_some(ContractChanges::default().merklize());
+        let contract_changes_root = ContractChanges::default_merkle_root(PROTOCOL_VERSION);
 
         // ChunkExtra is needed for in-memory trie loading code to query state roots.
         let chunk_extra = ChunkExtra::new(

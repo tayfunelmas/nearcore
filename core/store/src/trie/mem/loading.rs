@@ -517,9 +517,7 @@ mod tests {
         let congestion_info = ProtocolFeature::CongestionControl
             .enabled(PROTOCOL_VERSION)
             .then(CongestionInfo::default);
-        let contract_changes_root = ProtocolFeature::ExcludeContractCodeFromStateWitness
-            .enabled(PROTOCOL_VERSION)
-            .then_some(ContractChanges::default().merklize());
+        let contract_changes_root = ContractChanges::default_merkle_root(PROTOCOL_VERSION);
 
         let chunk_extra = ChunkExtra::new(
             PROTOCOL_VERSION,

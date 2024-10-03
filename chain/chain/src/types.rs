@@ -124,7 +124,7 @@ impl ApplyChunkResult {
     }
 
     pub fn contract_changes_root(&self) -> Option<MerkleHash> {
-        self.contract_changes.as_ref().map(|c| c.merklize())
+        self.contract_changes.as_ref().map(|c| c.merkle_root())
     }
 }
 

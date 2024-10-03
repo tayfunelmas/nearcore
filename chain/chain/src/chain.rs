@@ -600,9 +600,7 @@ impl Chain {
         genesis_protocol_version: ProtocolVersion,
         congestion_info: Option<CongestionInfo>,
     ) -> ChunkExtra {
-        let contract_changes_root = ProtocolFeature::ExcludeContractCodeFromStateWitness
-            .enabled(genesis_protocol_version)
-            .then_some(ContractChanges::default().merklize());
+        let contract_changes_root = ContractChanges::default_merkle_root(genesis_protocol_version);
         ChunkExtra::new(
             genesis_protocol_version,
             state_root,

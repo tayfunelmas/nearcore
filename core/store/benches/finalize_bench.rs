@@ -120,9 +120,7 @@ fn create_chunk_header(height: u64, shard_id: u64) -> ShardChunkHeader {
     let congestion_info = ProtocolFeature::CongestionControl
         .enabled(PROTOCOL_VERSION)
         .then_some(CongestionInfo::default());
-    let contract_changes_root = ProtocolFeature::ExcludeContractCodeFromStateWitness
-        .enabled(PROTOCOL_VERSION)
-        .then_some(ContractChanges::default().merklize());
+    let contract_changes_root = ContractChanges::default_merkle_root(PROTOCOL_VERSION);
 
     ShardChunkHeader::V3(ShardChunkHeaderV3::new(
         PROTOCOL_VERSION,
@@ -197,9 +195,7 @@ fn create_encoded_shard_chunk(
     let congestion_info = ProtocolFeature::CongestionControl
         .enabled(PROTOCOL_VERSION)
         .then_some(CongestionInfo::default());
-    let contract_changes_root = ProtocolFeature::ExcludeContractCodeFromStateWitness
-        .enabled(PROTOCOL_VERSION)
-        .then_some(ContractChanges::default().merklize());
+    let contract_changes_root = ContractChanges::default_merkle_root(PROTOCOL_VERSION);
 
     ShardsManagerActor::create_encoded_shard_chunk(
         Default::default(),

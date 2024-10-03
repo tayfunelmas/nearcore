@@ -4,7 +4,8 @@ use itertools::Itertools;
 use near_crypto::{PublicKey, Signature};
 use near_primitives_core::{
     hash::{hash, CryptoHash},
-    types::{BlockHeight, CodeBytes, CodeHash, MerkleHash, ShardId},
+    types::{BlockHeight, CodeBytes, CodeHash, MerkleHash, ProtocolVersion, ShardId},
+    version::ProtocolFeature,
 };
 use near_schema_checker_lib::ProtocolSchema;
 
@@ -93,9 +94,15 @@ impl ContractChanges {
         }
     }
 
-    // TODO(#11099): Use CryptoHash::default() for the default root hash.
-    // For this, search for .then_some(ContractChanges::default().merklize());
-    pub fn merklize(&self) -> MerkleHash {
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn merkle_root(&self) -> MerkleHash {
+        // If no change, then return the default hash.
+        if self.is_empty() {
+            return MerkleHash::default();
+        }
         let changes: Vec<CodeHashWithRefCount> = self
             .0
             .iter()
@@ -106,6 +113,13 @@ impl ContractChanges {
             .collect_vec();
         let (root, _paths) = merklize(changes.as_slice());
         root
+    }
+
+    /// Returns the merkle root for the default (empty) changes or None if not enabled in the given protocol version.
+    pub fn default_merkle_root(protocol_version: ProtocolVersion) -> Option<MerkleHash> {
+        ProtocolFeature::ExcludeContractCodeFromStateWitness
+            .enabled(protocol_version)
+            .then(|| MerkleHash::default())
     }
 }
 
@@ -128,7 +142,7 @@ impl ContractChange {
         if self.refcount_delta == 0 {
             return Some("Refcount delta is zero".to_string());
         }
-        if self.code_hash == CryptoHash::default() {
+        if self.code_hash == CodeHash::default() {
             return Some("Code hash is set to default".to_string());
         }
         if let Some(code) = self.code.as_ref() {
@@ -218,5 +232,28 @@ impl EncodedContractChangesInner {
             encoded_changes,
             signature_differentiator: "ContractChanges".to_owned(),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use near_primitives_core::{types::MerkleHash, version::ProtocolFeature};
+
+    use crate::contract_distribution::ContractChanges;
+
+    #[test]
+    fn test_default_merkle_hash() {
+        assert_eq!(
+            ContractChanges::default_merkle_root(
+                ProtocolFeature::StatelessValidation.protocol_version()
+            ),
+            None
+        );
+        assert_eq!(
+            ContractChanges::default_merkle_root(
+                ProtocolFeature::ExcludeContractCodeFromStateWitness.protocol_version()
+            ),
+            Some(MerkleHash::default())
+        );
     }
 }

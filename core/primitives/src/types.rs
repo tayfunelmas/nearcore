@@ -807,9 +807,7 @@ pub mod chunk_extra {
             } else {
                 None
             };
-            let contract_changes_root = ProtocolFeature::ExcludeContractCodeFromStateWitness
-                .enabled(PROTOCOL_VERSION)
-                .then_some(ContractChanges::default().merklize());
+            let contract_changes_root = ContractChanges::default_merkle_root(PROTOCOL_VERSION);
 
             Self::new(
                 PROTOCOL_VERSION,

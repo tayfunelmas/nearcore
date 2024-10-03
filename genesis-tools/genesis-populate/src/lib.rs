@@ -272,9 +272,7 @@ impl GenesisBuilder {
 
             let congestion_info =
                 self.get_congestion_info(protocol_version, &genesis, shard_id, state_root)?;
-            let contract_changes_root = ProtocolFeature::ExcludeContractCodeFromStateWitness
-                .enabled(PROTOCOL_VERSION)
-                .then_some(ContractChanges::default().merklize());
+            let contract_changes_root = ContractChanges::default_merkle_root(PROTOCOL_VERSION);
 
             store_update.save_chunk_extra(
                 genesis.hash(),
