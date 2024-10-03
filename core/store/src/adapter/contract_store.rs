@@ -73,20 +73,18 @@ impl ContractStoreUpdateAdapter<'static> {
 
     pub fn save_block_contract_changes(&mut self, changes: &ContractChanges) -> io::Result<()> {
         for change in changes.0.iter() {
-            let key = change.code_hash.as_ref();
-            let value = change.code.as_ref();
-            let delta = change.refcount_delta;
+            let delta = change.refcount_delta();
             if delta.is_positive() {
                 self.store_update.increment_refcount_by(
                     DBCol::ContractCode,
-                    key,
-                    value.unwrap(),
+                    change.code_hash().as_ref(),
+                    change.code().unwrap(),
                     delta.unsigned_abs(),
                 );
             } else {
                 self.store_update.decrement_refcount_by(
                     DBCol::ContractCode,
-                    key,
+                    change.code_hash().as_ref(),
                     delta.unsigned_abs(),
                 );
             }

@@ -5,7 +5,7 @@ use bytesize::ByteSize;
 use itertools::Itertools;
 use near_crypto::{PublicKey, Signature};
 use near_primitives_core::{
-    hash::CryptoHash,
+    hash::{hash, CryptoHash},
     types::{BlockHeight, CodeBytes, CodeHash, MerkleHash, ProtocolVersion, ShardId},
     version::ProtocolFeature,
 };
@@ -107,6 +107,16 @@ impl ContractChanges {
             .enabled(protocol_version)
             .then(|| MerkleHash::default())
     }
+
+    pub fn validate(&self) -> Option<Vec<String>> {
+        let mut errors = vec![];
+        for change in self.0.iter() {
+            if let Some(e) = change.validate() {
+                errors.extend(e.into_iter());
+            }
+        }
+        errors.is_empty().then_some(errors)
+    }
 }
 
 // Used to calculate the merkle hash of the contract changes.
@@ -118,9 +128,48 @@ struct CodeHashWithRefCount {
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema)]
 pub struct ContractChange {
-    pub code_hash: CodeHash,
-    pub code: Option<CodeBytes>,
-    pub refcount_delta: NonZeroI32,
+    code_hash: CodeHash,
+    code: Option<CodeBytes>,
+    refcount_delta: NonZeroI32,
+}
+
+impl ContractChange {
+    pub fn new(code_hash: CodeHash, code: Option<CodeBytes>, refcount_delta: i32) -> Self {
+        let refcount_delta =
+            NonZeroI32::new(refcount_delta).expect("refcount delta must be nonzero");
+        Self { code_hash, code, refcount_delta }
+    }
+
+    pub fn validate(&self) -> Option<Vec<String>> {
+        let mut errors = vec![];
+        if self.code_hash == CodeHash::default() {
+            errors.push("Code hash is set to default".to_string());
+        }
+        if let Some(code) = self.code.as_ref() {
+            if code.is_empty() {
+                errors.push("Code is empty".to_string());
+            }
+            if hash(code) != self.code_hash {
+                errors.push("Invalid code hash".to_string());
+            }
+        }
+        if self.refcount_delta.is_positive() && self.code.is_none() {
+            errors.push("Refcount delta is positive but code is not present".to_string());
+        }
+        errors.is_empty().then_some(errors)
+    }
+
+    pub fn code_hash(&self) -> &CodeHash {
+        &self.code_hash
+    }
+
+    pub fn code(&self) -> Option<&CodeBytes> {
+        self.code.as_ref()
+    }
+
+    pub fn refcount_delta(&self) -> NonZeroI32 {
+        self.refcount_delta
+    }
 }
 
 pub const MAX_UNCOMPRESSED_CONTRACT_CHANGES_SIZE: u64 =

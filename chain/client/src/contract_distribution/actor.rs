@@ -11,9 +11,9 @@ use near_epoch_manager::EpochManagerAdapter;
 use near_network::contract_distribution::SignedEncodedContractChangesMessage;
 use near_network::types::{NetworkRequests, PeerManagerAdapter, PeerManagerMessageRequest};
 use near_performance_metrics_macros::perf;
-use near_primitives::contract_distribution::{ContractChanges, SignedEncodedContractChanges};
-use near_primitives::hash::{hash, CryptoHash};
-use near_primitives::types::{CodeHash, ShardId};
+use near_primitives::contract_distribution::SignedEncodedContractChanges;
+use near_primitives::hash::CryptoHash;
+use near_primitives::types::ShardId;
 use near_store::adapter::contract_store::ContractStoreAdapter;
 use near_store::adapter::StoreAdapter;
 
@@ -147,28 +147,16 @@ impl ContractDistributionActor {
         let (changes, _size) = signed_encoded_changes.decode()?;
         tracing::trace!(target: "code-dist", num_changes=changes.inner().0.len(), "Actor decoded received SignedEncodedContractChanges");
 
-        validate_contract_changes(changes.inner())?;
+        if let Some(errors) = changes.inner().validate() {
+            return Err(Error::InvalidContractChanges(format!(
+                "Invalid contract changes. Errors: {:?}",
+                errors
+            )));
+        }
 
         tracing::trace!(target: "code-dist", changes=?changes.inner(), "Actor forwarding decoded contract changes to Client");
         self.client_sender.send(ContractChangesMessage(changes));
 
         Ok(())
     }
-}
-
-fn validate_contract_changes(changes: &ContractChanges) -> Result<(), Error> {
-    for change in changes.0.iter() {
-        if change.code_hash == CodeHash::default() {
-            return Err(Error::InvalidContractChanges("Code hash is set to default".to_string()));
-        }
-        if let Some(code) = change.code.as_ref() {
-            if code.is_empty() {
-                return Err(Error::InvalidContractChanges("Code is empty".to_string()));
-            }
-            if hash(code) != change.code_hash {
-                return Err(Error::InvalidContractChanges("Invalid code hash".to_string()));
-            }
-        }
-    }
-    Ok(())
 }
