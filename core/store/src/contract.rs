@@ -154,13 +154,15 @@ impl ContractStorageUpdate {
     }
 
     pub(crate) fn commit(&mut self) {
-        // TODO(#11099): assert!(self.committed_changes.is_none(), "Already committed");
         self.committed_changes = Some(self.uncommitted_changes.take_changes());
     }
 
-    pub(crate) fn finalize(self) -> ContractChanges {
-        // TODO(#11099): assert!(self.uncommitted_changes.is_empty(), "Has uncommited changes before finalizing");
-        self.committed_changes.unwrap_or_else(|| panic!("Finalizing before committing"))
+    pub(crate) fn finalize(mut self) -> ContractChanges {
+        assert!(self.uncommitted_changes.is_empty(), "Has uncommited changes before finalizing");
+        if self.committed_changes.is_none() {
+            self.commit();
+        }
+        self.committed_changes.unwrap()
     }
 }
 
