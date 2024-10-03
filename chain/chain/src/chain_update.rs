@@ -293,7 +293,7 @@ impl<'a> ChainUpdate<'a> {
         if let Some(contract_updates) =
             self.save_contract_changes_from_prev_chunks(prev_hash, block.chunks())?
         {
-            tracing::trace!(target: "code-dist", "ChainUpdate saving contract changes from previous block in postprocess_block");
+            tracing::trace!(target: "code-dist", "ChainUpdate saving contract changes from previous block");
             self.chain_store_update.merge(contract_updates.into());
         }
 
@@ -710,6 +710,7 @@ impl<'a> ChainUpdate<'a> {
             let shard_id = chunk_header.shard_id();
             let prev_height_included = prev_block.chunks()[shard_id as usize].height_included();
             let prev_hash_included = chain_store.get_block_hash_by_height(prev_height_included)?;
+            tracing::trace!(target: "code-dist", prev_height_included, ?prev_hash_included, shard_id, "ChainUpdate saving contract changes from previous chunk");
 
             let Some(chunk_contract_changes) =
                 contract_store.get_chunk_contract_changes(&prev_hash_included, shard_id)?
