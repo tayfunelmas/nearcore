@@ -592,6 +592,7 @@ impl<'a> ChainStoreUpdate<'a> {
             self.gc_outgoing_receipts(&block_hash, shard_id);
             self.gc_col(DBCol::IncomingReceipts, &block_shard_id);
             self.gc_col(DBCol::StateTransitionData, &block_shard_id);
+            self.gc_col(DBCol::ChunkContractChanges, &block_shard_id);
 
             // For incoming State Parts it's done in chain.clear_downloaded_parts()
             // The following code is mostly for outgoing State Parts.
@@ -692,8 +693,8 @@ impl<'a> ChainStoreUpdate<'a> {
             // delete Receipts
             self.gc_outgoing_receipts(&block_hash, shard_id);
             self.gc_col(DBCol::IncomingReceipts, &block_shard_id);
-
             self.gc_col(DBCol::StateTransitionData, &block_shard_id);
+            self.gc_col(DBCol::ChunkContractChanges, &block_shard_id);
 
             // delete DBCol::ChunkExtra based on shard_uid since it's indexed by shard_uid in the storage
             self.gc_col(DBCol::ChunkExtra, &block_shard_id);
@@ -962,6 +963,9 @@ impl<'a> ChainStoreUpdate<'a> {
             DBCol::LatestWitnessesByIndex => {
                 store_update.delete(col, key);
             }
+            DBCol::ChunkContractChanges => {
+                store_update.delete(col, key);
+            }
             DBCol::DbVersion
             | DBCol::BlockMisc
             | DBCol::_GCCount
@@ -995,7 +999,6 @@ impl<'a> ChainStoreUpdate<'a> {
             | DBCol::_ReceiptIdToShardId
             // TODO(#11099): Garbage collect contract code column.
             | DBCol::ContractCode
-            | DBCol::ChunkContractChanges
             => unreachable!(),
         }
         self.merge(store_update);

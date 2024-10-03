@@ -733,6 +733,7 @@ impl<'a> ChainUpdate<'a> {
             let store_update_inner =
                 store_update.get_or_insert_with(|| contract_store.store_update());
             store_update_inner.save_block_contract_changes(contract_changes)?;
+            // TODO(#11099): This is also garbage collected, so consider deleting this.
             store_update_inner.delete_chunk_contract_changes(&prev_hash_included, shard_id);
         }
         Ok(store_update.map(|update| update.into()))

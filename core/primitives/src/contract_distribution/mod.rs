@@ -1,9 +1,11 @@
+use std::num::NonZeroI32;
+
 use borsh::{BorshDeserialize, BorshSerialize};
 use bytesize::ByteSize;
 use itertools::Itertools;
 use near_crypto::{PublicKey, Signature};
 use near_primitives_core::{
-    hash::{hash, CryptoHash},
+    hash::CryptoHash,
     types::{BlockHeight, CodeBytes, CodeHash, MerkleHash, ProtocolVersion, ShardId},
     version::ProtocolFeature,
 };
@@ -78,22 +80,6 @@ impl Into<ContractChanges> for ChunkContractChanges {
 pub struct ContractChanges(pub Vec<ContractChange>);
 
 impl ContractChanges {
-    pub fn merge_from(&mut self, other: ContractChanges) {
-        // TODO(#11099): Optimize this, for now leaving with a naive implementation.
-        'outer: for other_change in other.0.into_iter() {
-            for my_change in self.0.iter_mut() {
-                if my_change.code_hash == other_change.code_hash {
-                    my_change.refcount_delta += other_change.refcount_delta;
-                    if my_change.code.is_none() && other_change.code.is_some() {
-                        my_change.code = other_change.code;
-                    }
-                    continue 'outer;
-                }
-            }
-            self.0.push(other_change);
-        }
-    }
-
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -127,34 +113,14 @@ impl ContractChanges {
 #[derive(BorshSerialize, ProtocolSchema)]
 struct CodeHashWithRefCount {
     code_hash: CodeHash,
-    refcount_delta: u64,
+    refcount_delta: NonZeroI32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, ProtocolSchema)]
 pub struct ContractChange {
     pub code_hash: CodeHash,
     pub code: Option<CodeBytes>,
-    pub refcount_delta: u64,
-}
-
-impl ContractChange {
-    pub fn validate(&self) -> Option<&str> {
-        if self.refcount_delta == 0 {
-            return Some("Refcount delta is zero");
-        }
-        if self.code_hash == CodeHash::default() {
-            return Some("Code hash is set to default");
-        }
-        if let Some(code) = self.code.as_ref() {
-            if code.is_empty() {
-                return Some("Code is empty");
-            }
-            if hash(code) != self.code_hash {
-                return Some("Invalid code hash");
-            }
-        }
-        None
-    }
+    pub refcount_delta: NonZeroI32,
 }
 
 pub const MAX_UNCOMPRESSED_CONTRACT_CHANGES_SIZE: u64 =

@@ -5,6 +5,7 @@ use near_primitives::types::CodeHash;
 use near_vm_runner::ContractCode;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
+use std::num::NonZeroI32;
 use std::sync::{Arc, RwLock};
 
 use crate::adapter::contract_store::ContractStoreAdapter;
@@ -13,7 +14,7 @@ use crate::TrieStorage;
 #[derive(Default)]
 struct ContractCodeWithRefcount {
     code: Option<ContractCode>,
-    refcount_delta: u64,
+    refcount_delta: i32,
 }
 
 impl From<ContractCode> for ContractCodeWithRefcount {
@@ -76,7 +77,8 @@ impl UncommittedContractChanges {
                 changes.0.push(ContractChange {
                     code_hash,
                     code: code_with_refcount.code.as_ref().map(|c| c.code().to_vec()),
-                    refcount_delta: code_with_refcount.refcount_delta,
+                    // TODO(#11099): Implement code to make sure we always have non-zero when doing this.
+                    refcount_delta: NonZeroI32::new(code_with_refcount.refcount_delta).unwrap(),
                 });
             }
         }
@@ -103,7 +105,6 @@ pub struct ContractStorageUpdate {
     /// The State this field should be removed, and the `Storage::store` function should be
     /// adjusted to write out the contract into the relevant part of the database immediately
     /// (without going through transactional storage operations and such).
-    /// TODO(#11099): Move Arc<> to here.
     uncommitted_changes: UncommittedContractChanges,
 
     committed_changes: Option<ContractChanges>,

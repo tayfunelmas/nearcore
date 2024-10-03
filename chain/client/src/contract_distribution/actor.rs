@@ -12,8 +12,8 @@ use near_network::contract_distribution::SignedEncodedContractChangesMessage;
 use near_network::types::{NetworkRequests, PeerManagerAdapter, PeerManagerMessageRequest};
 use near_performance_metrics_macros::perf;
 use near_primitives::contract_distribution::{ContractChanges, SignedEncodedContractChanges};
-use near_primitives::hash::CryptoHash;
-use near_primitives::types::ShardId;
+use near_primitives::hash::{hash, CryptoHash};
+use near_primitives::types::{CodeHash, ShardId};
 use near_store::adapter::contract_store::ContractStoreAdapter;
 use near_store::adapter::StoreAdapter;
 
@@ -158,9 +158,17 @@ impl ContractDistributionActor {
 
 fn validate_contract_changes(changes: &ContractChanges) -> Result<(), Error> {
     for change in changes.0.iter() {
-        change
-            .validate()
-            .map_or(Ok(()), |err| Err(Error::InvalidContractChanges(err.to_string())))?;
+        if change.code_hash == CodeHash::default() {
+            return Err(Error::InvalidContractChanges("Code hash is set to default".to_string()));
+        }
+        if let Some(code) = change.code.as_ref() {
+            if code.is_empty() {
+                return Err(Error::InvalidContractChanges("Code is empty".to_string()));
+            }
+            if hash(code) != change.code_hash {
+                return Err(Error::InvalidContractChanges("Invalid code hash".to_string()));
+            }
+        }
     }
     Ok(())
 }
