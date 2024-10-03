@@ -7,6 +7,9 @@ use crate::client::{
 use crate::concurrency::demux;
 use crate::concurrency::runtime::Runtime;
 use crate::config;
+use crate::contract_distribution::{
+    ContractDistributionSenderForNetwork, SignedEncodedContractChangesMessage,
+};
 use crate::network_protocol::{
     Edge, EdgeState, PartialEdgeInfo, PeerIdOrHash, PeerInfo, PeerMessage, RawRoutedMessage,
     RoutedMessageBody, RoutedMessageV2, SignedAccountData, SnapshotHostInfo,
@@ -111,6 +114,7 @@ pub(crate) struct NetworkState {
     pub client: ClientSenderForNetwork,
     pub shards_manager_adapter: Sender<ShardsManagerRequestFromNetwork>,
     pub partial_witness_adapter: PartialWitnessSenderForNetwork,
+    pub contract_distribution_adapter: ContractDistributionSenderForNetwork,
 
     /// Network-related info about the chain.
     pub chain_info: ArcSwap<Option<ChainInfo>>,
@@ -186,6 +190,7 @@ impl NetworkState {
         client: ClientSenderForNetwork,
         shards_manager_adapter: Sender<ShardsManagerRequestFromNetwork>,
         partial_witness_adapter: PartialWitnessSenderForNetwork,
+        contract_distribution_adapter: ContractDistributionSenderForNetwork,
         whitelist_nodes: Vec<WhitelistNode>,
     ) -> Self {
         Self {
@@ -203,6 +208,7 @@ impl NetworkState {
             client,
             shards_manager_adapter,
             partial_witness_adapter,
+            contract_distribution_adapter,
             chain_info: Default::default(),
             tier2: connection::Pool::new(config.node_id()),
             tier1: connection::Pool::new(config.node_id()),
@@ -802,6 +808,12 @@ impl NetworkState {
                         }),
                     });
                 }
+                None
+            }
+            RoutedMessageBody::ContractChanges(message) => {
+                tracing::trace!(target: "code-dist", "Received ContractChanges from network, forwarding to actor");
+                self.contract_distribution_adapter
+                    .send(SignedEncodedContractChangesMessage(message));
                 None
             }
             body => {

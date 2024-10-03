@@ -1,6 +1,9 @@
 use crate::broadcast;
 use crate::client::{ClientSenderForNetworkInput, ClientSenderForNetworkMessage};
 use crate::config::NetworkConfig;
+use crate::contract_distribution::{
+    ContractDistributionSenderForNetworkInput, ContractDistributionSenderForNetworkMessage,
+};
 use crate::network_protocol::testonly as data;
 use crate::network_protocol::{
     Edge, PartialEdgeInfo, PeerIdOrHash, PeerMessage, RawRoutedMessage, RoutedMessageBody,
@@ -47,6 +50,7 @@ pub(crate) enum Event {
     Client(ClientSenderForNetworkInput),
     Network(peer_manager_actor::Event),
     PartialWitness(PartialWitnessSenderForNetworkInput),
+    ContractChanges(ContractDistributionSenderForNetworkInput),
 }
 
 pub(crate) struct PeerHandle {
@@ -129,6 +133,12 @@ impl PeerHandle {
                 send.send(Event::PartialWitness(event.into_input()));
             }
         });
+        let contract_distribution_sender = Sender::from_fn({
+            let send = send.clone();
+            move |event: ContractDistributionSenderForNetworkMessage| {
+                send.send(Event::ContractChanges(event.into_input()));
+            }
+        });
         let network_state = Arc::new(NetworkState::new(
             &clock,
             store.clone(),
@@ -138,6 +148,7 @@ impl PeerHandle {
             client_sender.break_apart().into_multi_sender(),
             shards_manager_sender,
             state_witness_sender.break_apart().into_multi_sender(),
+            contract_distribution_sender.break_apart().into_multi_sender(),
             vec![],
         ));
         let actix = ActixSystem::spawn({

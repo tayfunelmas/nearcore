@@ -9,6 +9,7 @@ use near_chain::{Chain, ChainGenesis};
 use near_chain_configs::{ClientConfig, Genesis, GenesisConfig, MutableConfigValue};
 use near_chunks::shards_manager_actor::start_shards_manager;
 use near_client::adapter::client_sender_for_network;
+use near_client::contract_distribution::actor::ContractDistributionActor;
 use near_client::{start_client, PartialWitnessActor, SyncAdapter, ViewClientActorInner};
 use near_epoch_manager::shard_tracker::ShardTracker;
 use near_epoch_manager::EpochManager;
@@ -27,6 +28,7 @@ use near_primitives::block::GenesisId;
 use near_primitives::network::PeerId;
 use near_primitives::test_utils::create_test_signer;
 use near_primitives::types::{AccountId, ValidatorId};
+use near_store::adapter::StoreAdapter;
 use near_store::genesis::initialize_genesis_state;
 use near_telemetry::{TelemetryActor, TelemetryConfig};
 use nearcore::NightshadeRuntime;
@@ -146,10 +148,18 @@ fn setup_network_node(
         Clock::real(),
         network_adapter.as_multi_sender(),
         client_actor.clone().with_auto_span_context().into_multi_sender(),
-        validator_signer,
-        epoch_manager,
+        validator_signer.clone(),
+        epoch_manager.clone(),
         runtime.store().clone(),
     ));
+    let (contract_distribution_actor, _) = spawn_actix_actor(ContractDistributionActor::new(
+        network_adapter.as_multi_sender(),
+        client_actor.clone().with_auto_span_context().into_multi_sender(),
+        validator_signer,
+        epoch_manager,
+        runtime.store().contract_store(),
+    ));
+
     shards_manager_adapter.bind(shards_manager_actor.with_auto_span_context());
     let peer_manager = PeerManagerActor::spawn(
         time::Clock::real(),
@@ -158,6 +168,7 @@ fn setup_network_node(
         client_sender_for_network(client_actor, view_client_addr),
         shards_manager_adapter.as_sender(),
         partial_witness_actor.with_auto_span_context().into_multi_sender(),
+        contract_distribution_actor.with_auto_span_context().into_multi_sender(),
         genesis_id,
     )
     .unwrap();

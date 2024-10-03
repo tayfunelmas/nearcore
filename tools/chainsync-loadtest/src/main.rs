@@ -46,6 +46,7 @@ pub fn start_with_config(config: NearConfig, qps_limit: u32) -> anyhow::Result<A
         network.as_client_adapter(),
         noop().into_sender(),
         noop().into_multi_sender(),
+        noop().into_multi_sender(),
         GenesisId {
             chain_id: config.client_config.chain_id.clone(),
             hash: genesis_hash(&config.client_config.chain_id),

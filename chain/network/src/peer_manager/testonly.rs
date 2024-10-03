@@ -5,6 +5,8 @@ use crate::client::ClientSenderForNetworkMessage;
 use crate::client::StateRequestPart;
 use crate::client::StateResponse;
 use crate::config;
+use crate::contract_distribution::ContractDistributionSenderForNetworkInput;
+use crate::contract_distribution::ContractDistributionSenderForNetworkMessage;
 use crate::network_protocol::testonly as data;
 use crate::network_protocol::SnapshotHostInfo;
 use crate::network_protocol::StateResponseInfo;
@@ -74,6 +76,7 @@ pub enum Event {
     Client(ClientSenderForNetworkInput),
     PeerManager(PME),
     PartialWitness(PartialWitnessSenderForNetworkInput),
+    ContractChanges(ContractDistributionSenderForNetworkInput),
 }
 
 pub(crate) struct ActorHandler {
@@ -635,6 +638,12 @@ pub(crate) async fn start(
                     send.send(Event::PartialWitness(event.into_input()));
                 }
             });
+            let contract_distribution_sender = Sender::from_fn({
+                let send = send.clone();
+                move |event: ContractDistributionSenderForNetworkMessage| {
+                    send.send(Event::ContractChanges(event.into_input()));
+                }
+            });
             PeerManagerActor::spawn(
                 clock,
                 store,
@@ -642,6 +651,7 @@ pub(crate) async fn start(
                 client_sender.break_apart().into_multi_sender(),
                 shards_manager_sender,
                 state_witness_sender.break_apart().into_multi_sender(),
+                contract_distribution_sender.break_apart().into_multi_sender(),
                 genesis_id,
             )
             .unwrap()

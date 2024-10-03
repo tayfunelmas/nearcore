@@ -411,7 +411,7 @@ pub fn start_with_config_and_synchronization(
         adv,
         config_updater,
         partial_witness_actor.clone().with_auto_span_context().into_multi_sender(),
-        contract_distribution_actor.with_auto_span_context().into_multi_sender(),
+        contract_distribution_actor.clone().with_auto_span_context().into_multi_sender(),
         true,
         None,
     );
@@ -457,6 +457,7 @@ pub fn start_with_config_and_synchronization(
         client_sender_for_network(client_actor.clone(), view_client_addr.clone()),
         shards_manager_adapter.as_sender(),
         partial_witness_actor.with_auto_span_context().into_multi_sender(),
+        contract_distribution_actor.with_auto_span_context().into_multi_sender(),
         genesis_id,
     )
     .context("PeerManager::spawn()")?;

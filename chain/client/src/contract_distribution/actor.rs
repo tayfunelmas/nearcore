@@ -51,6 +51,7 @@ pub struct ContractDistributionSenderForClient {
 impl Handler<DistributeContractChangesRequest> for ContractDistributionActor {
     #[perf]
     fn handle(&mut self, msg: DistributeContractChangesRequest) {
+        tracing::trace!(target: "code-dist", "Actor handling DistributeContractChangesRequest");
         if let Err(err) = self.handle_distribute_contract_changes(&msg.block_hash, msg.shard_id) {
             tracing::error!(target: "client", ?err, "Failed to handle DistributeContractChangesRequest");
         }
@@ -84,23 +85,16 @@ impl ContractDistributionActor {
         let Some(contract_changes) =
             self.store.get_chunk_contract_changes(&block_hash, shard_id)?
         else {
+            tracing::error!(target: "code-dist", ?block_hash, shard_id, "Failed to find chunk contract changes");
             return Err(Error::Other(format!(
                 "ChunkContractChanges not found for block {:?} and shard {}",
                 block_hash, shard_id
             )));
         };
 
+        tracing::trace!(target: "code-dist", ?block_hash, shard_id, "Actor signing and encoding chunk contract changes");
+
         let metadata = &contract_changes.metadata;
-
-        tracing::debug!(target: "client", epoch_id=?metadata.epoch_id, shard_id=?metadata.shard_id, height=?metadata.height_created, "distribute_contract_changes");
-
-        let signer = match self.my_signer.get() {
-            Some(signer) => signer,
-            None => {
-                return Err(Error::NotAValidator(format!("distribute contract changes")));
-            }
-        };
-
         let validators = self
             .epoch_manager
             .get_epoch_all_validators(&metadata.epoch_id)?
@@ -108,8 +102,15 @@ impl ContractDistributionActor {
             .map(|vs| vs.account_id().clone())
             .collect_vec();
 
+        let signer = match self.my_signer.get() {
+            Some(signer) => signer,
+            None => {
+                return Err(Error::NotAValidator(format!("distribute contract changes")));
+            }
+        };
         let encoded_changes = SignedEncodedContractChanges::new(contract_changes, &signer)?;
 
+        tracing::trace!(target: "code-dist", ?block_hash, shard_id, ?validators, "Actor distributing chunk contract changes to validators");
         self.network_adapter.send(PeerManagerMessageRequest::NetworkRequests(
             NetworkRequests::ContractChanges(validators, encoded_changes),
         ));
@@ -146,7 +147,7 @@ impl ContractDistributionActor {
 
         validate_contract_changes(changes.inner())?;
 
-        tracing::info!(target: "code-dist", changes=?changes.inner(), "Received contract changes");
+        tracing::trace!(target: "code-dist", changes=?changes.inner(), "Received contract changes");
         self.client_sender.send(ContractChangesMessage(changes));
 
         Ok(())

@@ -15,6 +15,7 @@ pub struct ContractChangesMessage(pub ChunkContractChanges);
 
 impl Client {
     pub(crate) fn distribute_contract_changes(&self, block_hash: CryptoHash, shard_id: ShardId) {
+        tracing::trace!(target: "code-dist", "Client sending DistributeContractChangesRequest");
         self.contract_distribution_adapter
             .send(DistributeContractChangesRequest { block_hash, shard_id });
     }

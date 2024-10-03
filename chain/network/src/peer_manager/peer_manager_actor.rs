@@ -1,5 +1,6 @@
 use crate::client::{ClientSenderForNetwork, SetNetworkInfo, StateRequestPart};
 use crate::config;
+use crate::contract_distribution::ContractDistributionSenderForNetwork;
 use crate::debug::{DebugStatus, GetDebugStatus};
 use crate::network_protocol;
 use crate::network_protocol::SyncSnapshotHosts;
@@ -217,6 +218,7 @@ impl PeerManagerActor {
         client: ClientSenderForNetwork,
         shards_manager_adapter: Sender<ShardsManagerRequestFromNetwork>,
         partial_witness_adapter: PartialWitnessSenderForNetwork,
+        contract_distribution_adapter: ContractDistributionSenderForNetwork,
         genesis_id: GenesisId,
     ) -> anyhow::Result<actix::Addr<Self>> {
         let config = config.verify().context("config")?;
@@ -248,6 +250,7 @@ impl PeerManagerActor {
             client,
             shards_manager_adapter,
             partial_witness_adapter,
+            contract_distribution_adapter,
             whitelist_nodes,
         ));
         arbiter.spawn({
