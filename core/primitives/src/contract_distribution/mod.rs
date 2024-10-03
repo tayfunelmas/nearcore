@@ -170,7 +170,7 @@ impl ContractChange {
 }
 
 pub const MAX_UNCOMPRESSED_CONTRACT_CHANGES_SIZE: u64 =
-    ByteSize::mib(if cfg!(feature = "test_features") { 512 } else { 64 }).0;
+    ByteSize::mib(if cfg!(feature = "test_features") { 512 } else { 4 }).0;
 pub const CONTRACT_CHANGES_COMPRESSION_LEVEL: i32 = 3;
 
 #[derive(
