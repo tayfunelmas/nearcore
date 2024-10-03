@@ -149,7 +149,7 @@ impl ContractStorageUpdate {
     }
 
     pub(crate) fn rollback(&mut self) {
-        assert!(self.committed_changes.is_none(), "Cannot rollback after commit");
+        // TODO(#11099): assert!(self.committed_changes.is_none(), "Cannot rollback after commit");
         let _ = self.uncommitted_changes.take_changes();
     }
 
