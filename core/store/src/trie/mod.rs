@@ -1610,10 +1610,13 @@ impl Trie {
     }
 
     /// Retrieve the code given the code hash.
-    /// This function does not perform any recording.
+    /// This function does not perform any recording if contract_storage is used.
     fn retrieve_code(&self, code_hash: &CodeHash) -> Result<Vec<u8>, StorageError> {
-        let storage = self.contract_storage.as_ref().unwrap_or(&self.trie_storage);
-        storage.retrieve_raw_bytes(code_hash).map(|bytes| bytes.to_vec())
+        if let Some(contract_storage) = &self.contract_storage {
+            contract_storage.retrieve_raw_bytes(code_hash).map(|bytes| bytes.to_vec())
+        } else {
+            self.retrieve_value(code_hash)
+        }
     }
 
     fn deref_available_value(&self, value_token: &ValueAccessToken) -> Vec<u8> {

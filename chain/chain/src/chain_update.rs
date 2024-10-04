@@ -168,6 +168,7 @@ impl<'a> ChainUpdate<'a> {
                     let mut store_update =
                         self.chain_store_update.store().contract_store().store_update();
                     tracing::trace!(target: "code-dist", "ChainUpdate saving ChunkContractChanges after applying new chunk");
+                    // TODO(#11099): Add these changes to self.chain_store_update and call save_chunk_contract_changes later in ChainStoreUpdate.finalize.
                     store_update.save_chunk_contract_changes(
                         block_hash,
                         shard_id,
