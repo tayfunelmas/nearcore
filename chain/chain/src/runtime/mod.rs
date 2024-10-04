@@ -44,7 +44,7 @@ use near_store::flat::FlatStorageManager;
 use near_store::metadata::DbKind;
 use near_store::{
     ApplyStatePartResult, DBCol, ShardTries, StateSnapshotConfig, Store, Trie, TrieConfig,
-    TrieUpdate, WrappedTrieChanges, COLD_HEAD_KEY,
+    TrieStorage, TrieUpdate, WrappedTrieChanges, COLD_HEAD_KEY,
 };
 use near_vm_runner::ContractCode;
 use near_vm_runner::{precompile_contract, ContractRuntimeCache, FilesystemContractRuntimeCache};
@@ -764,11 +764,14 @@ impl RuntimeAdapter for NightshadeRuntime {
                 trie
             }
             StorageDataSource::Recorded(partial_storage) => {
-                let contract_storage =
-                    ContractStorage::new(self.store().contract_store(), shard_uid);
+                let contract_storage = ProtocolFeature::ExcludeContractCodeFromStateWitness
+                    .enabled(protocol_version)
+                    .then(|| -> Arc<dyn TrieStorage> {
+                        Arc::new(ContractStorage::new(self.store().contract_store(), shard_uid))
+                    });
                 Trie::from_recorded_storage(
                     partial_storage,
-                    Some(Arc::new(contract_storage)),
+                    contract_storage,
                     storage_config.state_root,
                     storage_config.use_flat_storage,
                 )
@@ -996,13 +999,20 @@ impl RuntimeAdapter for NightshadeRuntime {
                 trie
             }
             StorageDataSource::Recorded(partial_storage) => {
-                let shard_uid =
-                    self.get_shard_uid_from_prev_hash(shard_id, &block.prev_block_hash)?;
-                let contract_storage =
-                    ContractStorage::new(self.store().contract_store(), shard_uid);
+                let epoch_id =
+                    self.epoch_manager.get_epoch_id_from_prev_block(&block.prev_block_hash)?;
+                let protocol_version = self.epoch_manager.get_epoch_protocol_version(&epoch_id)?;
+                let contract_storage = ProtocolFeature::ExcludeContractCodeFromStateWitness
+                    .enabled(protocol_version)
+                    .then(|| -> Arc<dyn TrieStorage> {
+                        let shard_uid = self
+                            .get_shard_uid_from_prev_hash(shard_id, &block.prev_block_hash)
+                            .unwrap();
+                        Arc::new(ContractStorage::new(self.store().contract_store(), shard_uid))
+                    });
                 Trie::from_recorded_storage(
                     partial_storage,
-                    Some(Arc::new(contract_storage)),
+                    contract_storage,
                     storage_config.state_root,
                     storage_config.use_flat_storage,
                 )

@@ -1871,6 +1871,7 @@ pub mod estimator {
 mod tests {
     use crate::adapter::StoreAdapter;
     use assert_matches::assert_matches;
+    use near_primitives::version::{ProtocolFeature, PROTOCOL_VERSION};
     use rand::Rng;
 
     use crate::contract::ContractStorage;
@@ -2247,14 +2248,14 @@ mod tests {
         trie2.get_impl(b"dog").unwrap();
         trie2.get_impl(b"horse").unwrap();
         let partial_storage = trie2.recorded_storage();
-        let contract_storage = ContractStorage::new(tries.store().contract_store(), shard_uid);
+        let contract_storage = ProtocolFeature::ExcludeContractCodeFromStateWitness
+            .enabled(PROTOCOL_VERSION)
+            .then(|| -> Arc<dyn TrieStorage> {
+                Arc::new(ContractStorage::new(tries.store().contract_store(), shard_uid))
+            });
 
-        let trie3 = Trie::from_recorded_storage(
-            partial_storage.unwrap(),
-            Some(Arc::new(contract_storage)),
-            root,
-            false,
-        );
+        let trie3 =
+            Trie::from_recorded_storage(partial_storage.unwrap(), contract_storage, root, false);
 
         assert_eq!(trie3.get_impl(b"dog"), Ok(Some(b"puppy".to_vec())));
         assert_eq!(trie3.get_impl(b"horse"), Ok(Some(b"stallion".to_vec())));

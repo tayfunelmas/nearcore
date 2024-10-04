@@ -215,6 +215,7 @@ mod trie_storage_tests {
     use assert_matches::assert_matches;
     use near_o11y::testonly::init_test_logger;
     use near_primitives::hash::hash;
+    use near_primitives::version::{ProtocolFeature, PROTOCOL_VERSION};
 
     fn create_store_with_values(values: &[Vec<u8>], shard_uid: ShardUId) -> TrieStoreAdapter {
         let tries = TestTriesBuilder::new().build();
@@ -527,11 +528,15 @@ mod trie_storage_tests {
 
         assert_eq!(disk_iter_recorded, memtrie_iter_recorded);
 
-        let contract_storage = ContractStorage::new(tries.store().contract_store(), shard_uid);
+        let contract_storage = ProtocolFeature::ExcludeContractCodeFromStateWitness
+            .enabled(PROTOCOL_VERSION)
+            .then(|| -> Arc<dyn TrieStorage> {
+                Arc::new(ContractStorage::new(tries.store().contract_store(), shard_uid))
+            });
         let partial_recorded = {
             let trie = Trie::from_recorded_storage(
                 memtrie_iter_recorded,
-                Some(Arc::new(contract_storage)),
+                contract_storage,
                 state_root,
                 true,
             )

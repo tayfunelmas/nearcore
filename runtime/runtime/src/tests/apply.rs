@@ -34,7 +34,7 @@ use near_store::adapter::StoreAdapter;
 use near_store::contract::ContractStorage;
 use near_store::test_utils::TestTriesBuilder;
 use near_store::trie::receipts_column_helper::ShardsOutgoingReceiptBuffer;
-use near_store::{get_account, set_access_key, set_account, ShardTries, Trie};
+use near_store::{get_account, set_access_key, set_account, ShardTries, Trie, TrieStorage};
 use near_vm_runner::FilesystemContractRuntimeCache;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -1153,10 +1153,12 @@ fn test_main_storage_proof_size_soft_limit() {
     // Check that alice contract is present in storage proof and bob
     // contract is not.
     let partial_storage = apply_result.proof.unwrap();
-    let contract_storage =
-        ContractStorage::new(tries.store().contract_store(), ShardUId::single_shard());
-    let storage =
-        Trie::from_recorded_storage(partial_storage, Some(Arc::new(contract_storage)), root, false);
+    let contract_storage = ProtocolFeature::ExcludeContractCodeFromStateWitness
+        .enabled(PROTOCOL_VERSION)
+        .then(|| -> Arc<dyn TrieStorage> {
+            Arc::new(ContractStorage::new(tries.store().contract_store(), ShardUId::single_shard()))
+        });
+    let storage = Trie::from_recorded_storage(partial_storage, contract_storage, root, false);
     let code_key = TrieKey::ContractCode { account_id: alice_account() };
     assert_matches!(storage.get(&code_key), Ok(Some(_)));
     let code_key = TrieKey::ContractCode { account_id: bob_account() };

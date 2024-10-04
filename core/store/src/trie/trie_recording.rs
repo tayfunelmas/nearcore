@@ -276,6 +276,7 @@ impl SubtreeSize {
 mod trie_recording_tests {
     use crate::adapter::trie_store::TrieStoreAdapter;
     use crate::adapter::{StoreAdapter, StoreUpdateAdapter};
+    use crate::contract::ContractStorage;
     use crate::db::refcount::decode_value_with_rc;
     use crate::test_utils::{
         gen_larger_changes, simplify_changes, test_populate_flat_storage, test_populate_trie,
@@ -283,7 +284,7 @@ mod trie_recording_tests {
     };
     use crate::trie::mem::metrics::MEM_TRIE_NUM_LOOKUPS;
     use crate::trie::TrieNodesCount;
-    use crate::{DBCol, KeyLookupMode, PartialStorage, ShardTries, Store, Trie};
+    use crate::{DBCol, KeyLookupMode, PartialStorage, ShardTries, Store, Trie, TrieStorage};
     use borsh::BorshDeserialize;
     use near_primitives::challenge::PartialState;
     use near_primitives::congestion_info::CongestionInfo;
@@ -298,6 +299,7 @@ mod trie_recording_tests {
     use rand::{random, thread_rng, Rng};
     use std::collections::{HashMap, HashSet};
     use std::num::NonZeroU32;
+    use std::sync::Arc;
 
     const NUM_ITERATIONS_PER_TEST: usize = 300;
 
@@ -601,9 +603,14 @@ mod trie_recording_tests {
                 partial_storage.nodes.len(),
                 data_in_trie.len()
             );
+            let contract_storage = ProtocolFeature::ExcludeContractCodeFromStateWitness
+                .enabled(PROTOCOL_VERSION)
+                .then(|| -> Arc<dyn TrieStorage> {
+                    Arc::new(ContractStorage::new(store.contract_store(), shard_uid))
+                });
             let trie = Trie::from_recorded_storage(
                 partial_storage.clone(),
-                trie.contract_storage.clone(),
+                contract_storage.clone(),
                 state_root,
                 use_flat_storage,
             );
@@ -625,7 +632,7 @@ mod trie_recording_tests {
             // Build a Trie using recorded storage and enable recording_reads on this Trie
             let trie = Trie::from_recorded_storage(
                 partial_storage,
-                trie.contract_storage.clone(),
+                contract_storage,
                 state_root,
                 use_flat_storage,
             )
