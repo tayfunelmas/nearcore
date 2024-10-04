@@ -1,7 +1,6 @@
 use near_primitives::contract_distribution::{ContractChange, ContractChanges};
-use near_primitives::errors::{MissingTrieValueContext, StorageError};
+use near_primitives::errors::StorageError;
 use near_primitives::hash::CryptoHash;
-use near_primitives::shard_layout::ShardUId;
 use near_primitives::types::CodeHash;
 use near_vm_runner::ContractCode;
 use std::collections::btree_map::Entry;
@@ -9,8 +8,7 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
 
 use crate::adapter::contract_store::ContractStoreAdapter;
-use crate::adapter::StoreAdapter;
-use crate::{TrieDBStorage, TrieStorage};
+use crate::TrieStorage;
 
 #[derive(Default)]
 struct ContractCodeWithRefcount {
@@ -172,34 +170,16 @@ impl ContractStorageUpdate {
 #[derive(Clone)]
 pub struct ContractStorage {
     store: ContractStoreAdapter,
-    state_fallback: Arc<TrieDBStorage>,
 }
 
 impl ContractStorage {
-    pub fn new(store: ContractStoreAdapter, shard_uid: ShardUId) -> Self {
-        let state_fallback = Arc::new(TrieDBStorage::new(store.trie_store(), shard_uid));
-        Self { store, state_fallback }
+    pub fn new(store: ContractStoreAdapter) -> Self {
+        Self { store }
     }
 }
 
 impl TrieStorage for ContractStorage {
     fn retrieve_raw_bytes(&self, hash: &CryptoHash) -> Result<Arc<[u8]>, StorageError> {
-        match self.store.get_contract_code(hash) {
-            Ok(code) => Ok(Arc::from(code.as_slice())),
-            Err(StorageError::MissingTrieValue(_context, _hash)) => {
-                // TODO(#11099): Remove this fallback after stabilizing contract storage.
-                match self.state_fallback.retrieve_raw_bytes(hash) {
-                    Ok(code) => Ok(code),
-                    Err(StorageError::MissingTrieValue(_, hash)) => {
-                        Err(StorageError::MissingTrieValue(
-                            MissingTrieValueContext::ContractStorage,
-                            hash,
-                        ))
-                    }
-                    Err(error) => Err(error),
-                }
-            }
-            Err(error) => Err(error),
-        }
+        self.store.get_contract_code(hash).map(|code| Arc::from(code.as_slice()))
     }
 }

@@ -767,7 +767,7 @@ impl RuntimeAdapter for NightshadeRuntime {
                 let contract_storage = ProtocolFeature::ExcludeContractCodeFromStateWitness
                     .enabled(protocol_version)
                     .then(|| -> Arc<dyn TrieStorage> {
-                        Arc::new(ContractStorage::new(self.store().contract_store(), shard_uid))
+                        Arc::new(ContractStorage::new(self.store().contract_store()))
                     });
                 Trie::from_recorded_storage(
                     partial_storage,
@@ -1005,10 +1005,7 @@ impl RuntimeAdapter for NightshadeRuntime {
                 let contract_storage = ProtocolFeature::ExcludeContractCodeFromStateWitness
                     .enabled(protocol_version)
                     .then(|| -> Arc<dyn TrieStorage> {
-                        let shard_uid = self
-                            .get_shard_uid_from_prev_hash(shard_id, &block.prev_block_hash)
-                            .unwrap();
-                        Arc::new(ContractStorage::new(self.store().contract_store(), shard_uid))
+                        Arc::new(ContractStorage::new(self.store().contract_store()))
                     });
                 Trie::from_recorded_storage(
                     partial_storage,

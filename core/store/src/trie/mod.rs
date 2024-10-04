@@ -2251,7 +2251,7 @@ mod tests {
         let contract_storage = ProtocolFeature::ExcludeContractCodeFromStateWitness
             .enabled(PROTOCOL_VERSION)
             .then(|| -> Arc<dyn TrieStorage> {
-                Arc::new(ContractStorage::new(tries.store().contract_store(), shard_uid))
+                Arc::new(ContractStorage::new(tries.store().contract_store()))
             });
 
         let trie3 =

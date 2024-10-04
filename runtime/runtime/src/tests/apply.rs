@@ -1156,7 +1156,7 @@ fn test_main_storage_proof_size_soft_limit() {
     let contract_storage = ProtocolFeature::ExcludeContractCodeFromStateWitness
         .enabled(PROTOCOL_VERSION)
         .then(|| -> Arc<dyn TrieStorage> {
-            Arc::new(ContractStorage::new(tries.store().contract_store(), ShardUId::single_shard()))
+            Arc::new(ContractStorage::new(tries.store().contract_store()))
         });
     let storage = Trie::from_recorded_storage(partial_storage, contract_storage, root, false);
     let code_key = TrieKey::ContractCode { account_id: alice_account() };

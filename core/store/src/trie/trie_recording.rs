@@ -606,7 +606,7 @@ mod trie_recording_tests {
             let contract_storage = ProtocolFeature::ExcludeContractCodeFromStateWitness
                 .enabled(PROTOCOL_VERSION)
                 .then(|| -> Arc<dyn TrieStorage> {
-                    Arc::new(ContractStorage::new(store.contract_store(), shard_uid))
+                    Arc::new(ContractStorage::new(store.contract_store()))
                 });
             let trie = Trie::from_recorded_storage(
                 partial_storage.clone(),
