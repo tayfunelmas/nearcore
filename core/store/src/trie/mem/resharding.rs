@@ -199,8 +199,6 @@ mod tests {
     use itertools::Itertools;
     use near_primitives::{shard_layout::ShardUId, types::StateRoot};
 
-    use crate::adapter::StoreAdapter;
-    use crate::contract::ContractStorage;
     use crate::{
         test_utils::TestTriesBuilder,
         trie::{
@@ -253,14 +251,8 @@ mod tests {
         let new_state_root = memtries.apply_memtrie_changes(1, &memtrie_changes);
 
         let entries = if new_state_root != StateRoot::default() {
-            let contract_storage =
-                ContractStorage::new(shard_tries.store().contract_store(), shard_uid);
-            let trie = Trie::new(
-                Arc::new(TrieMemoryPartialStorage::default()),
-                Arc::new(contract_storage),
-                new_state_root,
-                None,
-            );
+            let trie =
+                Trie::new(Arc::new(TrieMemoryPartialStorage::default()), new_state_root, None);
             let state_root_ptr = memtries.get_root(&new_state_root).unwrap();
             MemTrieIterator::new(Some(state_root_ptr), &trie).map(|e| e.unwrap()).collect_vec()
         } else {

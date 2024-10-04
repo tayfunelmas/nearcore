@@ -119,7 +119,7 @@ pub struct ContractStorageUpdate {
 }
 
 impl ContractStorageUpdate {
-    pub(crate) fn from(storage: Arc<dyn TrieStorage>) -> Self {
+    pub(crate) fn new(storage: Arc<dyn TrieStorage>) -> Self {
         Self {
             storage,
             uncommitted_changes: UncommittedContractChanges::new(),

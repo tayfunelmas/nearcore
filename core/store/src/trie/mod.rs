@@ -23,14 +23,13 @@ use borsh::{BorshDeserialize, BorshSerialize};
 pub use from_flat::construct_trie_from_flat;
 use mem::mem_tries::MemTries;
 use near_primitives::challenge::PartialState;
-use near_primitives::errors::MissingTrieValueContext;
 use near_primitives::hash::{hash, CryptoHash};
 pub use near_primitives::shard_layout::ShardUId;
 use near_primitives::state::{FlatStateValue, ValueRef};
 use near_primitives::state_record::StateRecord;
 use near_primitives::trie_key::trie_key_parsers::parse_account_id_prefix;
 use near_primitives::trie_key::TrieKey;
-use near_primitives::types::{AccountId, StateRoot, StateRootNode};
+use near_primitives::types::{AccountId, CodeHash, StateRoot, StateRootNode};
 use near_schema_checker_lib::ProtocolSchema;
 use near_vm_runner::ContractCode;
 pub use raw_node::{Children, RawTrieNode, RawTrieNodeWithSize};
@@ -337,7 +336,7 @@ impl std::fmt::Debug for TrieNode {
 
 pub struct Trie {
     trie_storage: Arc<dyn TrieStorage>,
-    contract_storage: Arc<dyn TrieStorage>,
+    contract_storage: Option<Arc<dyn TrieStorage>>,
     memtries: Option<Arc<RwLock<MemTries>>>,
     root: StateRoot,
     /// If present, flat storage is used to look up keys (if asked for).
@@ -661,16 +660,24 @@ impl Trie {
     /// (only in this crate), call self.accounting_cache.borrow_mut().set_enabled().
     pub fn new(
         trie_storage: Arc<dyn TrieStorage>,
-        contract_storage: Arc<dyn TrieStorage>,
         root: StateRoot,
         flat_storage_chunk_view: Option<FlatStorageChunkView>,
     ) -> Self {
-        Self::new_with_memtries(trie_storage, contract_storage, None, root, flat_storage_chunk_view)
+        Self::new_impl(trie_storage, None, None, root, flat_storage_chunk_view)
     }
 
     pub fn new_with_memtries(
         trie_storage: Arc<dyn TrieStorage>,
-        contract_storage: Arc<dyn TrieStorage>,
+        memtries: Arc<RwLock<MemTries>>,
+        root: StateRoot,
+        flat_storage_chunk_view: Option<FlatStorageChunkView>,
+    ) -> Self {
+        Self::new_impl(trie_storage, None, Some(memtries), root, flat_storage_chunk_view)
+    }
+
+    fn new_impl(
+        trie_storage: Arc<dyn TrieStorage>,
+        contract_storage: Option<Arc<dyn TrieStorage>>,
         memtries: Option<Arc<RwLock<MemTries>>>,
         root: StateRoot,
         flat_storage_chunk_view: Option<FlatStorageChunkView>,
@@ -702,7 +709,7 @@ impl Trie {
     /// Makes a new trie that has everything the same except that access
     /// through that trie accumulates a state proof for all nodes accessed.
     pub fn recording_reads(&self) -> Self {
-        let mut trie = Self::new_with_memtries(
+        let mut trie = Self::new_impl(
             self.trie_storage.clone(),
             self.contract_storage.clone(),
             self.memtries.clone(),
@@ -753,8 +760,7 @@ impl Trie {
         let PartialState::TrieValues(nodes) = partial_storage.nodes;
         let recorded_storage = nodes.into_iter().map(|value| (hash(&value), value)).collect();
         let trie_storage = Arc::new(TrieMemoryPartialStorage::new(recorded_storage));
-        let contract_storage = contract_storage.unwrap_or_else(|| trie_storage.clone());
-        let mut trie = Self::new(trie_storage, contract_storage, root, None);
+        let mut trie = Self::new_impl(trie_storage, contract_storage, None, root, None);
         trie.charge_gas_for_trie_node_access = !flat_storage_used;
         trie
     }
@@ -1584,18 +1590,41 @@ impl Trie {
     ) -> Result<Vec<u8>, StorageError> {
         match optimized_value_ref {
             OptimizedValueRef::Ref(value_ref) => self.retrieve_value(&value_ref.hash),
-            OptimizedValueRef::AvailableValue(ValueAccessToken { value }) => {
-                let value_hash = hash(value);
-                let arc_value: Arc<[u8]> = value.clone().into();
-                self.accounting_cache
-                    .borrow_mut()
-                    .retroactively_account(value_hash, arc_value.clone());
-                if let Some(recorder) = &self.recorder {
-                    recorder.borrow_mut().record(&value_hash, arc_value);
-                }
-                Ok(value.clone())
+            OptimizedValueRef::AvailableValue(value_token) => {
+                Ok(self.deref_available_value(value_token))
             }
         }
+    }
+
+    fn deref_code_optimized(
+        &self,
+        optimized_value_ref: &OptimizedValueRef,
+    ) -> Result<Vec<u8>, StorageError> {
+        match optimized_value_ref {
+            OptimizedValueRef::Ref(value_ref) => self.retrieve_code(&value_ref.hash),
+            // TODO(#11099): Revisit this fallback to default impl.
+            OptimizedValueRef::AvailableValue(value_token) => {
+                Ok(self.deref_available_value(value_token))
+            }
+        }
+    }
+
+    /// Retrieve the code given the code hash.
+    /// This function does not perform any recording.
+    fn retrieve_code(&self, code_hash: &CodeHash) -> Result<Vec<u8>, StorageError> {
+        let storage = self.contract_storage.as_ref().unwrap_or(&self.trie_storage);
+        storage.retrieve_raw_bytes(code_hash).map(|bytes| bytes.to_vec())
+    }
+
+    fn deref_available_value(&self, value_token: &ValueAccessToken) -> Vec<u8> {
+        let ValueAccessToken { value } = value_token;
+        let value_hash = hash(value);
+        let arc_value: Arc<[u8]> = value.clone().into();
+        self.accounting_cache.borrow_mut().retroactively_account(value_hash, arc_value.clone());
+        if let Some(recorder) = &self.recorder {
+            recorder.borrow_mut().record(&value_hash, arc_value);
+        }
+        value.clone()
     }
 
     pub fn get(&self, key: &TrieKey) -> Result<Option<Vec<u8>>, StorageError> {
@@ -1607,21 +1636,7 @@ impl Trie {
 
     fn get_code(&self, key: &[u8]) -> Result<Option<Vec<u8>>, StorageError> {
         match self.get_optimized_ref(key, KeyLookupMode::FlatStorage)? {
-            Some(optimized_ref) => match optimized_ref {
-                OptimizedValueRef::Ref(value_ref) => {
-                    match self.contract_storage.retrieve_raw_bytes(&value_ref.hash) {
-                        Ok(bytes) => Ok(Some(bytes.to_vec())),
-                        Err(StorageError::MissingTrieValue(_context, hash)) => {
-                            Err(StorageError::MissingTrieValue(
-                                MissingTrieValueContext::ContractStorage,
-                                hash,
-                            ))
-                        }
-                        Err(err) => Err(err),
-                    }
-                }
-                _ => unreachable!("Unexpected optimized value ref"),
-            },
+            Some(optimized_ref) => Ok(Some(self.deref_code_optimized(&optimized_ref)?)),
             None => Ok(None),
         }
     }

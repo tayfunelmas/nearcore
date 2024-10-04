@@ -603,7 +603,7 @@ mod trie_recording_tests {
             );
             let trie = Trie::from_recorded_storage(
                 partial_storage.clone(),
-                Some(trie.contract_storage.clone()),
+                trie.contract_storage.clone(),
                 state_root,
                 use_flat_storage,
             );
@@ -625,7 +625,7 @@ mod trie_recording_tests {
             // Build a Trie using recorded storage and enable recording_reads on this Trie
             let trie = Trie::from_recorded_storage(
                 partial_storage,
-                Some(trie.contract_storage.clone()),
+                trie.contract_storage.clone(),
                 state_root,
                 use_flat_storage,
             )
