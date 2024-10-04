@@ -103,7 +103,6 @@ impl StatePartsSubCommand {
         near_config: NearConfig,
         store: Store,
     ) {
-        let contract_storage = ContractStorage::new(store.contract_store(), None);
         let epoch_manager =
             EpochManager::new_arc_handle(store.clone(), &near_config.genesis.config);
         let shard_tracker = ShardTracker::new(
@@ -158,7 +157,6 @@ impl StatePartsSubCommand {
                         chain_id,
                         store,
                         &external,
-                        Arc::new(contract_storage),
                     )
                     .await
                 }
@@ -187,7 +185,6 @@ impl StatePartsSubCommand {
                         chain_id,
                         store,
                         &external,
-                        Arc::new(contract_storage),
                     )
                     .await
                 }
@@ -333,9 +330,8 @@ async fn load_state_parts(
     chain_id: &str,
     store: Store,
     external: &ExternalConnection,
-    contract_storage: Arc<dyn TrieStorage>,
 ) {
-    let epoch_id = epoch_selection.to_epoch_id(store, chain);
+    let epoch_id = epoch_selection.to_epoch_id(store.clone(), chain);
     let (state_root, epoch_height, epoch_id, sync_hash) =
         if let (Some(state_root), Some(sync_hash), EpochSelection::EpochHeight { epoch_height }) =
             (maybe_state_root, maybe_sync_hash, &epoch_selection)
@@ -374,7 +370,9 @@ async fn load_state_parts(
         ?part_ids,
         "Loading state as seen at the beginning of the specified epoch.",
     );
-
+    let shard_uid =
+        chain.epoch_manager.shard_id_to_uid(shard_id, &epoch_id).expect("ShardUId must exist");
+    let contract_storage = Arc::new(ContractStorage::new(store.contract_store(), shard_uid));
     let timer = Instant::now();
     for part_id in part_ids {
         let timer = Instant::now();
@@ -454,9 +452,8 @@ async fn dump_state_parts(
     chain_id: &str,
     store: Store,
     external: &ExternalConnection,
-    contract_storage: Arc<dyn TrieStorage>,
 ) {
-    let epoch_id = epoch_selection.to_epoch_id(store, chain);
+    let epoch_id = epoch_selection.to_epoch_id(store.clone(), chain);
     let epoch = chain.epoch_manager.get_epoch_info(&epoch_id).unwrap();
     let sync_hash = get_any_block_hash_of_epoch(&epoch, chain);
     let sync_hash = StateSync::get_epoch_start_sync_hash(chain, &sync_hash).unwrap();
@@ -499,6 +496,9 @@ async fn dump_state_parts(
         tracing::info!(target: "state-parts", elapsed_sec = timer.elapsed().as_secs_f64(), "Header saved to external storage.");
     }
 
+    let shard_uid =
+        chain.epoch_manager.shard_id_to_uid(shard_id, &epoch_id).expect("ShardUId must exist");
+    let contract_storage = Arc::new(ContractStorage::new(store.contract_store(), shard_uid));
     // dump parts
     for part_id in part_ids {
         let timer = Instant::now();

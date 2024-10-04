@@ -1224,7 +1224,7 @@ impl RuntimeAdapter for NightshadeRuntime {
         match BorshDeserialize::try_from_slice(data) {
             Ok(trie_nodes) => {
                 let contract_storage =
-                    ContractStorage::new(self.store().contract_store(), ShardUid::single_shard());
+                    ContractStorage::new(self.store().contract_store(), ShardUId::single_shard());
                 match Trie::validate_state_part(
                     state_root,
                     part_id,

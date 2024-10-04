@@ -1158,8 +1158,8 @@ fn test_main_storage_proof_size_soft_limit() {
     let storage =
         Trie::from_recorded_storage(partial_storage, Some(Arc::new(contract_storage)), root, false);
     let code_key = TrieKey::ContractCode { account_id: alice_account() };
-    let code_key = TrieKey::ContractCode { account_id: bob_account() };
     assert_matches!(storage.get(&code_key), Ok(Some(_)));
+    let code_key = TrieKey::ContractCode { account_id: bob_account() };
     assert_matches!(storage.get(&code_key), Err(_) | Ok(None));
 }
 
