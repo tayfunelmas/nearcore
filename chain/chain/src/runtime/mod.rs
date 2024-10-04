@@ -1223,14 +1223,7 @@ impl RuntimeAdapter for NightshadeRuntime {
     fn validate_state_part(&self, state_root: &StateRoot, part_id: PartId, data: &[u8]) -> bool {
         match BorshDeserialize::try_from_slice(data) {
             Ok(trie_nodes) => {
-                let contract_storage =
-                    ContractStorage::new(self.store().contract_store(), ShardUId::single_shard());
-                match Trie::validate_state_part(
-                    state_root,
-                    part_id,
-                    trie_nodes,
-                    Some(Arc::new(contract_storage)),
-                ) {
+                match Trie::validate_state_part(state_root, part_id, trie_nodes) {
                     Ok(_) => true,
                     // Storage error should not happen
                     Err(err) => {
@@ -1262,9 +1255,8 @@ impl RuntimeAdapter for NightshadeRuntime {
         let part = BorshDeserialize::try_from_slice(data)
             .expect("Part was already validated earlier, so could never fail here");
         let shard_uid = self.get_shard_uid_from_epoch_id(shard_id, epoch_id)?;
-        let contract_storage = ContractStorage::new(self.store().contract_store(), shard_uid);
         let ApplyStatePartResult { trie_changes, flat_state_delta, contract_codes } =
-            Trie::apply_state_part(state_root, part_id, part, Arc::new(contract_storage));
+            Trie::apply_state_part(state_root, part_id, part);
         let tries = self.get_tries();
         let mut store_update = tries.store_update();
         tries.apply_all(&trie_changes, shard_uid, &mut store_update);

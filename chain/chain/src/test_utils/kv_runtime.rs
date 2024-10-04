@@ -1276,7 +1276,9 @@ impl RuntimeAdapter for KeyValueRuntime {
         self.state.write().unwrap().insert(state_root, state);
         self.state_size.write().unwrap().insert(state_root, state_size);
         let storage_proof = Some(Default::default());
-        let contract_changes = ProtocolFeature::ExcludeContractCodeFromStateWitness.enabled(PROTOCOL_VERSION).then_some(ContractChanges::default());
+        let contract_changes = ProtocolFeature::ExcludeContractCodeFromStateWitness
+            .enabled(PROTOCOL_VERSION)
+            .then_some(ContractChanges::default());
         Ok(ApplyChunkResult {
             trie_changes: WrappedTrieChanges::new(
                 self.get_tries(),
