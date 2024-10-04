@@ -1276,6 +1276,7 @@ impl RuntimeAdapter for KeyValueRuntime {
         self.state.write().unwrap().insert(state_root, state);
         self.state_size.write().unwrap().insert(state_root, state_size);
         let storage_proof = Some(Default::default());
+        let contract_changes = ProtocolFeature::ExcludeContractCodeFromStateWitness.enabled(PROTOCOL_VERSION).then_some(ContractChanges::default());
         Ok(ApplyChunkResult {
             trie_changes: WrappedTrieChanges::new(
                 self.get_tries(),
@@ -1296,8 +1297,7 @@ impl RuntimeAdapter for KeyValueRuntime {
             processed_yield_timeouts: vec![],
             applied_receipts_hash: hash(&borsh::to_vec(receipts).unwrap()),
             congestion_info: Self::get_congestion_info(PROTOCOL_VERSION),
-            // TODO(#11099): Check protocol version for this.
-            contract_changes: Some(ContractChanges::default()),
+            contract_changes,
         })
     }
 
