@@ -131,7 +131,7 @@ impl ShardTries {
         // Do not use memtries for view queries, for two reasons: memtries do not provide historical state,
         // and also this can introduce lock contention on memtries.
         let memtries = if is_view { None } else { self.get_mem_tries(shard_uid) };
-        let contract_storage = ContractStorage::new(self.store().contract_store(), Some(shard_uid));
+        let contract_storage = ContractStorage::new(self.store().contract_store(), shard_uid);
         Trie::new_with_memtries(
             storage,
             Arc::new(contract_storage),
@@ -156,7 +156,7 @@ impl ShardTries {
             .get_trie_cache_for(shard_uid, true)
             .expect("trie cache should be enabled for view calls");
         let trie_storage = Arc::new(TrieCachingStorage::new(store, cache, shard_uid, true, None));
-        let contract_storage = ContractStorage::new(self.store().contract_store(), Some(shard_uid));
+        let contract_storage = ContractStorage::new(self.store().contract_store(), shard_uid);
         let flat_storage_chunk_view = flat_storage_manager.chunk_view(shard_uid, *block_hash);
         Ok(Trie::new(trie_storage, Arc::new(contract_storage), state_root, flat_storage_chunk_view))
     }

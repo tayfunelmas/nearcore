@@ -2225,13 +2225,14 @@ mod tests {
             (b"dog".to_vec(), Some(b"puppy".to_vec())),
             (b"h".to_vec(), Some(b"value".to_vec())),
         ];
-        let root = test_populate_trie(&tries, &empty_root, ShardUId::single_shard(), changes);
+        let shard_uid = ShardUId::single_shard();
+        let root = test_populate_trie(&tries, &empty_root, shard_uid, changes);
 
-        let trie2 = tries.get_trie_for_shard(ShardUId::single_shard(), root).recording_reads();
+        let trie2 = tries.get_trie_for_shard(shard_uid, root).recording_reads();
         trie2.get_impl(b"dog").unwrap();
         trie2.get_impl(b"horse").unwrap();
         let partial_storage = trie2.recorded_storage();
-        let contract_storage = ContractStorage::new(tries.store().contract_store(), None);
+        let contract_storage = ContractStorage::new(tries.store().contract_store(), shard_uid);
 
         let trie3 = Trie::from_recorded_storage(
             partial_storage.unwrap(),

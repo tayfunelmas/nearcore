@@ -226,6 +226,7 @@ mod tests {
             .collect_vec();
         retain_result_naive.sort();
 
+        let shard_uid = ShardUId::single_shard();
         let shard_tries = TestTriesBuilder::new().build();
         let changes = retain_result_naive
             .iter()
@@ -234,11 +235,11 @@ mod tests {
         let expected_state_root = crate::test_utils::test_populate_trie(
             &shard_tries,
             &Trie::EMPTY_ROOT,
-            ShardUId::single_shard(),
+            shard_uid,
             changes,
         );
 
-        let mut memtries = MemTries::new(ShardUId::single_shard());
+        let mut memtries = MemTries::new(shard_uid);
         let mut update = memtries.update(Trie::EMPTY_ROOT, false).unwrap();
         for (key, value) in initial_entries {
             update.insert(&key, value);
@@ -252,7 +253,8 @@ mod tests {
         let new_state_root = memtries.apply_memtrie_changes(1, &memtrie_changes);
 
         let entries = if new_state_root != StateRoot::default() {
-            let contract_storage = ContractStorage::new(shard_tries.store().contract_store(), None);
+            let contract_storage =
+                ContractStorage::new(shard_tries.store().contract_store(), shard_uid);
             let trie = Trie::new(
                 Arc::new(TrieMemoryPartialStorage::default()),
                 Arc::new(contract_storage),

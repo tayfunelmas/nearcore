@@ -532,7 +532,7 @@ mod trie_storage_tests {
 
         assert_eq!(disk_iter_recorded, memtrie_iter_recorded);
 
-        let contract_storage = ContractStorage::new(tries.store().contract_store(), None);
+        let contract_storage = ContractStorage::new(tries.store().contract_store(), shard_uid);
         let partial_recorded = {
             let trie = Trie::from_recorded_storage(
                 memtrie_iter_recorded,

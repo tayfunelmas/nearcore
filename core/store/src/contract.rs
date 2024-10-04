@@ -172,13 +172,12 @@ impl ContractStorageUpdate {
 #[derive(Clone)]
 pub struct ContractStorage {
     store: ContractStoreAdapter,
-    state_fallback: Option<Arc<TrieDBStorage>>,
+    state_fallback: Arc<TrieDBStorage>,
 }
 
 impl ContractStorage {
-    pub fn new(store: ContractStoreAdapter, shard_uid: Option<ShardUId>) -> Self {
-        let state_fallback =
-            shard_uid.map(|shard_uid| Arc::new(TrieDBStorage::new(store.trie_store(), shard_uid)));
+    pub fn new(store: ContractStoreAdapter, shard_uid: ShardUId) -> Self {
+        let state_fallback = Arc::new(TrieDBStorage::new(store.trie_store(), shard_uid));
         Self { store, state_fallback }
     }
 }
@@ -187,20 +186,17 @@ impl TrieStorage for ContractStorage {
     fn retrieve_raw_bytes(&self, hash: &CryptoHash) -> Result<Arc<[u8]>, StorageError> {
         match self.store.get_contract_code(hash) {
             Ok(code) => Ok(Arc::from(code.as_slice())),
-            Err(StorageError::MissingTrieValue(context, hash_from_error)) => {
-                if let Some(state_fallback) = self.state_fallback.as_ref() {
-                    match state_fallback.retrieve_raw_bytes(hash) {
-                        Ok(code) => Ok(code),
-                        Err(StorageError::MissingTrieValue(_, hash)) => {
-                            Err(StorageError::MissingTrieValue(
-                                MissingTrieValueContext::ContractStorage,
-                                hash,
-                            ))
-                        }
-                        Err(error) => Err(error),
+            Err(StorageError::MissingTrieValue(_context, _hash)) => {
+                // TODO(#11099): Remove this fallback after stabilizing contract storage.
+                match self.state_fallback.retrieve_raw_bytes(hash) {
+                    Ok(code) => Ok(code),
+                    Err(StorageError::MissingTrieValue(_, hash)) => {
+                        Err(StorageError::MissingTrieValue(
+                            MissingTrieValueContext::ContractStorage,
+                            hash,
+                        ))
                     }
-                } else {
-                    Err(StorageError::MissingTrieValue(context, hash_from_error))
+                    Err(error) => Err(error),
                 }
             }
             Err(error) => Err(error),

@@ -753,7 +753,8 @@ mod tests {
     fn test_combine_empty_trie_parts() {
         let state_root = Trie::EMPTY_ROOT;
         let store = create_test_store();
-        let contract_storage = Arc::new(ContractStorage::new(store.contract_store(), None));
+        let contract_storage =
+            Arc::new(ContractStorage::new(store.contract_store(), ShardUId::single_shard()));
         let _ =
             Trie::combine_state_parts_naive(&state_root, &[], contract_storage.clone()).unwrap();
         let _ = Trie::validate_state_part(

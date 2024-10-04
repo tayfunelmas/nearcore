@@ -98,7 +98,7 @@ impl FlatStorageShardCreator {
         result_sender: Sender<u64>,
     ) {
         let trie_storage = TrieDBStorage::new(store.trie_store(), shard_uid);
-        let contract_storage = ContractStorage::new(store.contract_store(), Some(shard_uid));
+        let contract_storage = ContractStorage::new(store.contract_store(), shard_uid);
         let trie = Trie::new(Arc::new(trie_storage), Arc::new(contract_storage), state_root, None);
         let path_begin = trie.find_state_part_boundary(part_id.idx, part_id.total).unwrap();
         let path_end = trie.find_state_part_boundary(part_id.idx + 1, part_id.total).unwrap();
@@ -189,8 +189,7 @@ impl FlatStorageShardCreator {
                     let epoch_id = self.epoch_manager.get_epoch_id(&block_hash)?;
                     let shard_uid = self.epoch_manager.shard_id_to_uid(shard_id, &epoch_id)?;
                     let trie_storage = TrieDBStorage::new(store.trie_store(), shard_uid);
-                    let contract_storage =
-                        ContractStorage::new(store.contract_store(), Some(shard_uid));
+                    let contract_storage = ContractStorage::new(store.contract_store(), shard_uid);
                     let state_root =
                         *chain_store.get_chunk_extra(&block_hash, &shard_uid)?.state_root();
                     let trie = Trie::new(

@@ -764,7 +764,8 @@ impl RuntimeAdapter for NightshadeRuntime {
                 trie
             }
             StorageDataSource::Recorded(partial_storage) => {
-                let contract_storage = ContractStorage::new(self.store().contract_store(), None);
+                let contract_storage =
+                    ContractStorage::new(self.store().contract_store(), shard_uid);
                 Trie::from_recorded_storage(
                     partial_storage,
                     Some(Arc::new(contract_storage)),
@@ -995,7 +996,10 @@ impl RuntimeAdapter for NightshadeRuntime {
                 trie
             }
             StorageDataSource::Recorded(partial_storage) => {
-                let contract_storage = ContractStorage::new(self.store().contract_store(), None);
+                let shard_uid =
+                    self.get_shard_uid_from_prev_hash(shard_id, &block.prev_block_hash)?;
+                let contract_storage =
+                    ContractStorage::new(self.store().contract_store(), shard_uid);
                 Trie::from_recorded_storage(
                     partial_storage,
                     Some(Arc::new(contract_storage)),
@@ -1219,7 +1223,8 @@ impl RuntimeAdapter for NightshadeRuntime {
     fn validate_state_part(&self, state_root: &StateRoot, part_id: PartId, data: &[u8]) -> bool {
         match BorshDeserialize::try_from_slice(data) {
             Ok(trie_nodes) => {
-                let contract_storage = ContractStorage::new(self.store().contract_store(), None);
+                let contract_storage =
+                    ContractStorage::new(self.store().contract_store(), ShardUid::single_shard());
                 match Trie::validate_state_part(
                     state_root,
                     part_id,
@@ -1256,11 +1261,11 @@ impl RuntimeAdapter for NightshadeRuntime {
 
         let part = BorshDeserialize::try_from_slice(data)
             .expect("Part was already validated earlier, so could never fail here");
-        let contract_storage = ContractStorage::new(self.store().contract_store(), None);
+        let shard_uid = self.get_shard_uid_from_epoch_id(shard_id, epoch_id)?;
+        let contract_storage = ContractStorage::new(self.store().contract_store(), shard_uid);
         let ApplyStatePartResult { trie_changes, flat_state_delta, contract_codes } =
             Trie::apply_state_part(state_root, part_id, part, Arc::new(contract_storage));
         let tries = self.get_tries();
-        let shard_uid = self.get_shard_uid_from_epoch_id(shard_id, epoch_id)?;
         let mut store_update = tries.store_update();
         tries.apply_all(&trie_changes, shard_uid, &mut store_update);
         debug!(target: "chain", %shard_id, "Inserting {} values to flat storage", flat_state_delta.len());
