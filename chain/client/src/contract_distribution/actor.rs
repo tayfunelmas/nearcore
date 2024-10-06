@@ -40,6 +40,7 @@ impl Actor for ContractDistributionActor {}
 #[rtype(result = "()")]
 pub struct DistributeContractChangesRequest {
     pub block_hash: CryptoHash,
+    // TODO: Remove this and handle this for all shards?
     pub shard_id: ShardId,
 }
 

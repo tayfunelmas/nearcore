@@ -10,6 +10,7 @@ use near_chain_primitives::error::Error;
 use near_epoch_manager::EpochManagerAdapter;
 use near_primitives::block::Tip;
 use near_primitives::checked_feature;
+use near_primitives::contract_distribution::ChunkContractChanges;
 use near_primitives::errors::InvalidTxError;
 use near_primitives::hash::CryptoHash;
 use near_primitives::merkle::{MerklePath, PartialMerkleTree};
@@ -1386,6 +1387,8 @@ pub struct ChainStoreUpdate<'a> {
     add_state_sync_infos: Vec<StateSyncInfo>,
     remove_state_sync_infos: Vec<CryptoHash>,
     challenged_blocks: HashSet<CryptoHash>,
+    // TODO: Consider changing the type to ContractChanges, but need to find chunk production info from elsewhere.
+    chunk_contract_changes: HashMap<(CryptoHash, ShardId), ChunkContractChanges>,
 }
 
 impl<'a> ChainStoreUpdate<'a> {
@@ -1409,6 +1412,7 @@ impl<'a> ChainStoreUpdate<'a> {
             add_state_sync_infos: vec![],
             remove_state_sync_infos: vec![],
             challenged_blocks: HashSet::default(),
+            chunk_contract_changes: HashMap::default(),
         }
     }
 }
@@ -2016,6 +2020,10 @@ impl<'a> ChainStoreUpdate<'a> {
         }
     }
 
+    pub fn save_chunk_contract_changes(&mut self, block_hash: CryptoHash, shard_id: ShardId, changes: ChunkContractChanges) {
+        self.chunk_contract_changes.insert((block_hash, shard_id), changes);
+    }
+
     pub fn add_block_to_catchup(&mut self, prev_hash: CryptoHash, block_hash: CryptoHash) {
         self.add_blocks_to_catchup.push((prev_hash, block_hash));
     }
@@ -2482,6 +2490,21 @@ impl<'a> ChainStoreUpdate<'a> {
                     DBCol::StateTransitionData,
                     &get_block_shard_id(&block_hash, shard_id),
                     &state_transition_data,
+                )?;
+            }
+        }
+        {
+            let _span =
+                tracing::trace_span!(target: "code-dist", "write_chunk_contract_changes")
+                    .entered();
+
+            for ((block_hash, shard_id), changes) in
+                self.chunk_contract_changes.drain()
+            {
+                store_update.set_ser(
+                    DBCol::ChunkContractChanges,
+                    &get_block_shard_id(&block_hash, shard_id),
+                    &changes,
                 )?;
             }
         }

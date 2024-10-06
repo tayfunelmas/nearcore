@@ -165,21 +165,18 @@ impl<'a> ChainUpdate<'a> {
                     let chunk_headers = block.chunks();
                     let chunk_header =
                         chunk_headers.iter().filter(|c| c.shard_id() == shard_id).next().unwrap();
-                    let mut store_update =
-                        self.chain_store_update.store().contract_store().store_update();
                     tracing::trace!(target: "code-dist", "ChainUpdate saving ChunkContractChanges after applying new chunk");
-                    store_update.save_chunk_contract_changes(
-                        block_hash,
-                        shard_id,
-                        &ChunkContractChanges::new(
-                            epoch_id,
+                    self.chain_store_update.save_chunk_contract_changes(
                             *block_hash,
-                            chunk_header.height_created(),
-                            chunk_header.shard_id(),
-                            contract_changes,
-                        ),
-                    )?;
-                    self.chain_store_update.merge(store_update.into());
+                            shard_id,
+                            ChunkContractChanges::new(
+                                epoch_id,
+                                *block_hash,
+                                chunk_header.height_created(),
+                                chunk_header.shard_id(),
+                                contract_changes,
+                            ),
+                    );
                 }
             }
             ShardUpdateResult::OldChunk(OldChunkResult { shard_uid, apply_result }) => {
