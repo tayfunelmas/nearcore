@@ -5,7 +5,7 @@ use near_primitives::types::CodeHash;
 use near_vm_runner::ContractCode;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use crate::adapter::contract_store::ContractStoreAdapter;
 use crate::TrieStorage;
@@ -16,6 +16,15 @@ struct ContractCodeWithRefcount {
     refcount_delta: i32,
 }
 
+impl Clone for ContractCodeWithRefcount {
+    fn clone(&self) -> ContractCodeWithRefcount {
+        ContractCodeWithRefcount {
+            code: self.code.as_ref().map(|c| ContractCode::new(c.code().to_vec(), Some(*c.hash()))),
+            refcount_delta: self.refcount_delta,
+        }
+    }
+}
+
 impl From<ContractCode> for ContractCodeWithRefcount {
     fn from(code: ContractCode) -> Self {
         Self { code: Some(code), refcount_delta: 0 }
@@ -24,18 +33,16 @@ impl From<ContractCode> for ContractCodeWithRefcount {
 
 #[derive(Clone)]
 pub struct UncommittedContractChanges(
-    // TODO(#11099): This is single-threaded (per shard), so remove RwLock.
-    Arc<RwLock<Option<BTreeMap<CodeHash, ContractCodeWithRefcount>>>>,
+    Option<BTreeMap<CodeHash, ContractCodeWithRefcount>>,
 );
 
 impl UncommittedContractChanges {
     fn new() -> Self {
-        Self(Arc::new(RwLock::new(Some(BTreeMap::new()))))
+        Self(Some(BTreeMap::new()))
     }
 
-    fn record_deploy(&self, code: ContractCode) {
-        let mut guard = self.0.write().expect("no panics");
-        let changes = match guard.as_mut().unwrap().entry(*code.hash()) {
+    fn record_deploy(&mut self, code: ContractCode) {
+        let changes = match self.0.as_mut().unwrap().entry(*code.hash()) {
             Entry::Occupied(o) => {
                 let changes = o.into_mut();
                 if changes.code.is_none() {
@@ -48,9 +55,8 @@ impl UncommittedContractChanges {
         changes.refcount_delta += 1;
     }
 
-    fn record_delete(&self, code_hash: &CodeHash) {
-        let mut guard = self.0.write().expect("no panics");
-        let changes = match guard.as_mut().unwrap().entry(*code_hash) {
+    fn record_delete(&mut self, code_hash: &CodeHash) {
+        let changes = match self.0.as_mut().unwrap().entry(*code_hash) {
             Entry::Occupied(o) => o.into_mut(),
             Entry::Vacant(v) => v.insert(ContractCodeWithRefcount::default()),
         };
@@ -59,8 +65,7 @@ impl UncommittedContractChanges {
 
     fn get(&self, code_hash: &CodeHash) -> Option<ContractCode> {
         // Note: We do not check the refcount but always return the code.
-        let guard = self.0.read().expect("no panics");
-        if let Some(changes) = guard.as_ref().unwrap().get(code_hash) {
+        if let Some(changes) = self.0.as_ref().unwrap().get(code_hash) {
             if let Some(code) = changes.code.as_ref() {
                 debug_assert_eq!(code.hash(), code_hash);
                 return Some(ContractCode::new(code.code().to_vec(), Some(*code_hash)));
@@ -69,10 +74,9 @@ impl UncommittedContractChanges {
         None
     }
 
-    fn take_changes(&self) -> ContractChanges {
+    fn take_changes(&mut self) -> ContractChanges {
         let mut changes = ContractChanges::default();
-        let mut guard = self.0.write().expect("no panics");
-        let existing_changes = guard.replace(BTreeMap::new()).expect("should always be present");
+        let existing_changes = self.0.replace(BTreeMap::new()).expect("should always be present");
         for (code_hash, code_with_refcount) in existing_changes.into_iter() {
             if code_with_refcount.refcount_delta != 0 {
                 changes.0.push(ContractChange::new(
@@ -87,8 +91,7 @@ impl UncommittedContractChanges {
 
     fn is_empty(&self) -> bool {
         // Note: We do not check the refcount but always return the code.
-        let guard = self.0.read().expect("no panics");
-        guard.as_ref().unwrap().is_empty()
+        self.0.as_ref().unwrap().is_empty()
     }
 }
 
@@ -136,12 +139,12 @@ impl ContractStorageUpdate {
         }
     }
 
-    pub(crate) fn store(&self, code: ContractCode) {
+    pub(crate) fn store(&mut self, code: ContractCode) {
         // TODO(#11099): assert!(self.committed_changes.is_none(), "Cannot store after commit");
         self.uncommitted_changes.record_deploy(code);
     }
 
-    pub(crate) fn delete(&self, code_hash: &CodeHash) {
+    pub(crate) fn delete(&mut self, code_hash: &CodeHash) {
         // TODO(#11099): assert!(self.committed_changes.is_none(), "Cannot delete after commit");
         self.uncommitted_changes.record_delete(code_hash);
     }
