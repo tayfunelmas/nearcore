@@ -222,10 +222,10 @@ impl ProtocolFeature {
             ProtocolFeature::CongestionControl
             | ProtocolFeature::RemoveAccountWithLongStorageKey => 68,
             // DO NOT MERGE
-            ProtocolFeature::StatelessValidation
-            | ProtocolFeature::ChunkEndorsementsInBlockHeader => 69,
+            ProtocolFeature::StatelessValidation => 69,
             ProtocolFeature::BLS12381 | ProtocolFeature::EthImplicitAccounts => 70,
-            ProtocolFeature::FixMinStakeRatio => 71,
+            ProtocolFeature::FixMinStakeRatio
+            | ProtocolFeature::ChunkEndorsementsInBlockHeader => 71,
             ProtocolFeature::IncreaseStorageProofSizeSoftLimit
             | ProtocolFeature::ChunkEndorsementV2 => 72,
 
