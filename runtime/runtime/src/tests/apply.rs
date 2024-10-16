@@ -1,6 +1,6 @@
 use super::{to_yocto, GAS_PRICE};
 use crate::config::safe_add_gas;
-use crate::congestion_control::{receipt_congestion_gas, receipt_size};
+use crate::congestion_control::{compute_receipt_congestion_gas, compute_receipt_size};
 use crate::tests::{create_receipt_with_actions, MAX_ATTACHED_GAS};
 use crate::total_prepaid_exec_fees;
 use crate::{ApplyResult, ApplyState, Runtime, ValidatorAccountsUpdate};
@@ -26,7 +26,8 @@ use near_primitives::transaction::{
 };
 use near_primitives::trie_key::TrieKey;
 use near_primitives::types::{
-    Balance, Compute, EpochInfoProvider, Gas, MerkleHash, ShardId, StateChangeCause,
+    new_shard_id_tmp, shard_id_as_u32, Balance, Compute, EpochInfoProvider, Gas, MerkleHash,
+    ShardId, StateChangeCause,
 };
 use near_primitives::utils::create_receipt_id_from_transaction;
 use near_primitives::version::{ProtocolFeature, PROTOCOL_VERSION};
@@ -1221,8 +1222,8 @@ fn test_congestion_delayed_receipts_accounting() {
     if ProtocolFeature::CongestionControl.enabled(PROTOCOL_VERSION) {
         let congestion = apply_result.congestion_info.unwrap();
         let expected_delayed_gas =
-            (n - 1) * receipt_congestion_gas(&receipts[0], &apply_state.config).unwrap();
-        let expected_receipts_bytes = (n - 1) * receipt_size(&receipts[0]).unwrap() as u64;
+            (n - 1) * compute_receipt_congestion_gas(&receipts[0], &apply_state.config).unwrap();
+        let expected_receipts_bytes = (n - 1) * compute_receipt_size(&receipts[0]).unwrap() as u64;
 
         assert_eq!(expected_delayed_gas as u128, congestion.delayed_receipts_gas());
         assert_eq!(expected_receipts_bytes, congestion.receipt_bytes());
@@ -1247,9 +1248,9 @@ fn test_congestion_buffering() {
     // shard 0. Hence all receipts will be forwarded to shard 0. We don't
     // want local forwarding in the test, hence we need to use a different
     // shard id.
-    let local_shard = 1 as ShardId;
-    let local_shard_uid = ShardUId { version: 0, shard_id: local_shard as u32 };
-    let receiver_shard = 0 as ShardId;
+    let local_shard = new_shard_id_tmp(1);
+    let local_shard_uid = ShardUId { version: 0, shard_id: shard_id_as_u32(local_shard) };
+    let receiver_shard = new_shard_id_tmp(0);
 
     let initial_balance = to_yocto(1_000_000);
     let initial_locked = to_yocto(500_000);

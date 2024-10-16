@@ -4,8 +4,7 @@ use actix_cors::Cors;
 use actix_web::http::header;
 use actix_web::HttpRequest;
 use actix_web::{get, http, middleware, web, App, Error as HttpError, HttpResponse, HttpServer};
-use api::RpcRequest;
-pub use api::{RpcFrom, RpcInto};
+pub use api::{RpcFrom, RpcInto, RpcRequest};
 use near_async::actix::ActixResult;
 use near_async::messaging::{
     AsyncSendError, AsyncSender, CanSend, MessageWithCallback, SendAsync, Sender,
@@ -19,10 +18,11 @@ use near_client::{
 };
 use near_client_primitives::types::GetSplitStorageInfo;
 pub use near_jsonrpc_client as client;
+pub use near_jsonrpc_primitives as primitives;
 use near_jsonrpc_primitives::errors::{RpcError, RpcErrorKind};
 use near_jsonrpc_primitives::message::{Message, Request};
 use near_jsonrpc_primitives::types::config::{RpcProtocolConfigError, RpcProtocolConfigResponse};
-use near_jsonrpc_primitives::types::entity_debug::{EntityDebugHandler, EntityQuery};
+use near_jsonrpc_primitives::types::entity_debug::{EntityDebugHandler, EntityQueryWithParams};
 use near_jsonrpc_primitives::types::query::RpcQueryRequest;
 use near_jsonrpc_primitives::types::split_storage::{
     RpcSplitStorageInfoRequest, RpcSplitStorageInfoResponse,
@@ -1407,7 +1407,7 @@ async fn debug_handler(
 }
 
 async fn handle_entity_debug(
-    req: web::Json<EntityQuery>,
+    req: web::Json<EntityQueryWithParams>,
     handler: web::Data<JsonRpcHandler>,
 ) -> Result<HttpResponse, HttpError> {
     match handler.entity_debug_handler.query(req.0) {

@@ -1,7 +1,6 @@
 use near_async::messaging::{noop, IntoMultiSender, IntoSender, LateBoundSender};
 use near_async::test_loop::TestLoopV2;
 use near_async::time::Duration;
-use near_chain::chunks_store::ReadOnlyChunksStore;
 use near_chain::ChainGenesis;
 use near_chain_configs::test_genesis::TestGenesisBuilder;
 use near_chain_configs::{ClientConfig, MutableConfigValue};
@@ -17,6 +16,7 @@ use near_primitives::network::PeerId;
 
 use near_primitives::test_utils::create_test_signer;
 use near_primitives::types::AccountId;
+use near_store::adapter::StoreAdapter;
 
 use crate::test_loop::utils::ONE_NEAR;
 use near_store::genesis::initialize_genesis_state;
@@ -58,7 +58,7 @@ fn test_client_with_simple_test_loop() {
     for account in &accounts {
         genesis_builder.add_user_account_simple(account.clone(), initial_balance);
     }
-    let genesis = genesis_builder.build();
+    let (genesis, _) = genesis_builder.build();
 
     let store = create_test_store();
     initialize_genesis_state(store.clone(), &genesis, None);
@@ -105,17 +105,20 @@ fn test_client_with_simple_test_loop() {
         None,
         Arc::new(test_loop.async_computation_spawner(|_| Duration::milliseconds(80))),
         noop().into_multi_sender(),
+        Arc::new(test_loop.future_spawner()),
+        noop().into_multi_sender(),
     )
     .unwrap();
 
     let shards_manager = ShardsManagerActor::new(
         test_loop.clock(),
         validator_signer,
+        epoch_manager.clone(),
         epoch_manager,
         shard_tracker,
         noop().into_sender(),
         client_adapter.as_sender(),
-        ReadOnlyChunksStore::new(store),
+        store.chunk_store(),
         client.chain.head().unwrap(),
         client.chain.header_head().unwrap(),
         Duration::milliseconds(100),
@@ -132,7 +135,6 @@ fn test_client_with_simple_test_loop() {
         Default::default(),
         None,
         sync_jobs_adapter.as_multi_sender(),
-        Box::new(test_loop.future_spawner()),
     )
     .unwrap();
 

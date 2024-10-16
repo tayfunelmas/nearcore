@@ -6,13 +6,8 @@
 use crate::account::{AccessKey, AccessKeyPermission, Account, FunctionCallPermission};
 use crate::action::delegate::{DelegateAction, SignedDelegateAction};
 use crate::block::{Block, BlockHeader, Tip};
-use crate::block_header::{
-    BlockHeaderInnerLite, BlockHeaderInnerRest, BlockHeaderInnerRestV2, BlockHeaderInnerRestV3,
-    BlockHeaderV1, BlockHeaderV2, BlockHeaderV3,
-};
-use crate::block_header::{BlockHeaderInnerRestV4, BlockHeaderV4};
+use crate::block_header::BlockHeaderInnerLite;
 use crate::challenge::{Challenge, ChallengesResult};
-use crate::checked_feature;
 use crate::congestion_info::{CongestionInfo, CongestionInfoV1};
 use crate::errors::TxExecutionError;
 use crate::hash::{hash, CryptoHash};
@@ -24,6 +19,7 @@ use crate::sharding::{
     ChunkHash, ShardChunk, ShardChunkHeader, ShardChunkHeaderInner, ShardChunkHeaderInnerV2,
     ShardChunkHeaderInnerV3, ShardChunkHeaderV3,
 };
+use crate::stateless_validation::chunk_endorsements_bitmap::ChunkEndorsementsBitmap;
 #[cfg(feature = "protocol_feature_nonrefundable_transfer_nep491")]
 use crate::transaction::NonrefundableStorageTransferAction;
 use crate::transaction::{
@@ -427,7 +423,7 @@ pub enum SyncStatusView {
         highest_height: BlockHeight,
     },
     /// State sync, with different states of state sync for different shards.
-    StateSync(CryptoHash, HashMap<ShardId, ShardSyncDownloadView>),
+    StateSync(StateSyncStatusView),
     /// Sync state across all shards is done.
     StateSyncDone,
     /// Download and process blocks until the head reaches the head of the network.
@@ -436,6 +432,14 @@ pub enum SyncStatusView {
         current_height: BlockHeight,
         highest_height: BlockHeight,
     },
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq)]
+pub struct StateSyncStatusView {
+    pub sync_hash: CryptoHash,
+    pub shard_sync_status: HashMap<ShardId, String>,
+    pub download_tasks: Vec<String>,
+    pub computation_tasks: Vec<String>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq)]
@@ -773,6 +777,7 @@ pub struct BlockHeaderView {
     pub approvals: Vec<Option<Box<Signature>>>,
     pub signature: Signature,
     pub latest_protocol_version: ProtocolVersion,
+    pub chunk_endorsements: Option<Vec<Vec<u8>>>,
 }
 
 impl From<BlockHeader> for BlockHeaderView {
@@ -815,151 +820,45 @@ impl From<BlockHeader> for BlockHeaderView {
             approvals: header.approvals().to_vec(),
             signature: header.signature().clone(),
             latest_protocol_version: header.latest_protocol_version(),
+            chunk_endorsements: header.chunk_endorsements().map(|bitmap| bitmap.bytes()),
         }
     }
 }
 
 impl From<BlockHeaderView> for BlockHeader {
     fn from(view: BlockHeaderView) -> Self {
-        let inner_lite = BlockHeaderInnerLite {
-            height: view.height,
-            epoch_id: EpochId(view.epoch_id),
-            next_epoch_id: EpochId(view.next_epoch_id),
-            prev_state_root: view.prev_state_root,
-            prev_outcome_root: view.outcome_root,
-            timestamp: view.timestamp,
-            next_bp_hash: view.next_bp_hash,
-            block_merkle_root: view.block_merkle_root,
-        };
-        const LAST_HEADER_V2_VERSION: ProtocolVersion =
-            crate::version::ProtocolFeature::BlockHeaderV3.protocol_version() - 1;
-        if view.latest_protocol_version <= 29 {
-            let validator_proposals = view
-                .validator_proposals
-                .into_iter()
-                .map(|v| v.into_validator_stake().into_v1())
-                .collect();
-            let mut header = BlockHeaderV1 {
-                prev_hash: view.prev_hash,
-                inner_lite,
-                inner_rest: BlockHeaderInnerRest {
-                    prev_chunk_outgoing_receipts_root: view.chunk_receipts_root,
-                    chunk_headers_root: view.chunk_headers_root,
-                    chunk_tx_root: view.chunk_tx_root,
-                    chunks_included: view.chunks_included,
-                    challenges_root: view.challenges_root,
-                    random_value: view.random_value,
-                    prev_validator_proposals: validator_proposals,
-                    chunk_mask: view.chunk_mask,
-                    next_gas_price: view.gas_price,
-                    total_supply: view.total_supply,
-                    challenges_result: view.challenges_result,
-                    last_final_block: view.last_final_block,
-                    last_ds_final_block: view.last_ds_final_block,
-                    approvals: view.approvals.clone(),
-                    latest_protocol_version: view.latest_protocol_version,
-                },
-                signature: view.signature,
-                hash: CryptoHash::default(),
-            };
-            header.init();
-            BlockHeader::BlockHeaderV1(Arc::new(header))
-        } else if view.latest_protocol_version <= LAST_HEADER_V2_VERSION {
-            let validator_proposals = view
-                .validator_proposals
-                .into_iter()
-                .map(|v| v.into_validator_stake().into_v1())
-                .collect();
-            let mut header = BlockHeaderV2 {
-                prev_hash: view.prev_hash,
-                inner_lite,
-                inner_rest: BlockHeaderInnerRestV2 {
-                    prev_chunk_outgoing_receipts_root: view.chunk_receipts_root,
-                    chunk_headers_root: view.chunk_headers_root,
-                    chunk_tx_root: view.chunk_tx_root,
-                    challenges_root: view.challenges_root,
-                    random_value: view.random_value,
-                    prev_validator_proposals: validator_proposals,
-                    chunk_mask: view.chunk_mask,
-                    next_gas_price: view.gas_price,
-                    total_supply: view.total_supply,
-                    challenges_result: view.challenges_result,
-                    last_final_block: view.last_final_block,
-                    last_ds_final_block: view.last_ds_final_block,
-                    approvals: view.approvals.clone(),
-                    latest_protocol_version: view.latest_protocol_version,
-                },
-                signature: view.signature,
-                hash: CryptoHash::default(),
-            };
-            header.init();
-            BlockHeader::BlockHeaderV2(Arc::new(header))
-        } else if !checked_feature!("stable", BlockHeaderV4, view.latest_protocol_version) {
-            let mut header = BlockHeaderV3 {
-                prev_hash: view.prev_hash,
-                inner_lite,
-                inner_rest: BlockHeaderInnerRestV3 {
-                    prev_chunk_outgoing_receipts_root: view.chunk_receipts_root,
-                    chunk_headers_root: view.chunk_headers_root,
-                    chunk_tx_root: view.chunk_tx_root,
-                    challenges_root: view.challenges_root,
-                    random_value: view.random_value,
-                    prev_validator_proposals: view
-                        .validator_proposals
-                        .into_iter()
-                        .map(Into::into)
-                        .collect(),
-                    chunk_mask: view.chunk_mask,
-                    next_gas_price: view.gas_price,
-                    block_ordinal: view.block_ordinal.unwrap_or(0),
-                    total_supply: view.total_supply,
-                    challenges_result: view.challenges_result,
-                    last_final_block: view.last_final_block,
-                    last_ds_final_block: view.last_ds_final_block,
-                    prev_height: view.prev_height.unwrap_or_default(),
-                    epoch_sync_data_hash: view.epoch_sync_data_hash,
-                    approvals: view.approvals.clone(),
-                    latest_protocol_version: view.latest_protocol_version,
-                },
-                signature: view.signature,
-                hash: CryptoHash::default(),
-            };
-            header.init();
-            BlockHeader::BlockHeaderV3(Arc::new(header))
-        } else {
-            let mut header = BlockHeaderV4 {
-                prev_hash: view.prev_hash,
-                inner_lite,
-                inner_rest: BlockHeaderInnerRestV4 {
-                    block_body_hash: view.block_body_hash.unwrap_or_default(),
-                    prev_chunk_outgoing_receipts_root: view.chunk_receipts_root,
-                    chunk_headers_root: view.chunk_headers_root,
-                    chunk_tx_root: view.chunk_tx_root,
-                    challenges_root: view.challenges_root,
-                    random_value: view.random_value,
-                    prev_validator_proposals: view
-                        .validator_proposals
-                        .into_iter()
-                        .map(Into::into)
-                        .collect(),
-                    chunk_mask: view.chunk_mask,
-                    next_gas_price: view.gas_price,
-                    block_ordinal: view.block_ordinal.unwrap_or(0),
-                    total_supply: view.total_supply,
-                    challenges_result: view.challenges_result,
-                    last_final_block: view.last_final_block,
-                    last_ds_final_block: view.last_ds_final_block,
-                    prev_height: view.prev_height.unwrap_or_default(),
-                    epoch_sync_data_hash: view.epoch_sync_data_hash,
-                    approvals: view.approvals.clone(),
-                    latest_protocol_version: view.latest_protocol_version,
-                },
-                signature: view.signature,
-                hash: CryptoHash::default(),
-            };
-            header.init();
-            BlockHeader::BlockHeaderV4(Arc::new(header))
-        }
+        BlockHeader::from_view(
+            &view.hash,
+            view.latest_protocol_version,
+            view.height,
+            view.prev_hash,
+            view.block_body_hash.unwrap_or_default(),
+            view.prev_state_root,
+            view.chunk_receipts_root,
+            view.chunk_headers_root,
+            view.chunk_tx_root,
+            view.outcome_root,
+            view.timestamp,
+            view.challenges_root,
+            view.random_value,
+            view.validator_proposals.into_iter().map(|v| v.into_validator_stake()).collect(),
+            view.chunk_mask,
+            view.block_ordinal.unwrap_or(0),
+            EpochId(view.epoch_id),
+            EpochId(view.next_epoch_id),
+            view.gas_price,
+            view.total_supply,
+            view.challenges_result,
+            view.signature,
+            view.last_final_block,
+            view.last_ds_final_block,
+            view.epoch_sync_data_hash,
+            view.approvals,
+            view.next_bp_hash,
+            view.block_merkle_root,
+            view.prev_height.unwrap_or_default(),
+            view.chunk_endorsements.map(|bytes| ChunkEndorsementsBitmap::from_bytes(bytes)),
+        )
     }
 }
 

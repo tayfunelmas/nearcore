@@ -1,11 +1,14 @@
 use rand::Rng;
+use std::borrow::Cow;
 use std::path::Path;
 
 use near_chain::types::RuntimeAdapter;
 use near_chain::{ChainStore, ChainStoreAccess};
 use near_epoch_manager::EpochManagerAdapter;
 use near_primitives::hash::CryptoHash;
-use near_primitives::receipt::{DataReceipt, Receipt, ReceiptEnum, ReceiptV1};
+use near_primitives::receipt::{
+    DataReceipt, Receipt, ReceiptEnum, ReceiptOrStateStoredReceipt, ReceiptV1,
+};
 use near_primitives::types::{ShardId, StateChangeCause, StateRoot};
 use near_store::trie::receipts_column_helper::{DelayedReceiptQueue, TrieQueue};
 use near_store::{ShardTries, ShardUId, Store, TrieUpdate};
@@ -80,9 +83,19 @@ impl BootstrapCmd {
         let (epoch_manager, runtime, state_roots, block_header) =
             load_trie(store, home_dir, near_config);
 
+        let epoch_id = block_header.epoch_id();
+        let shard_layout = epoch_manager.get_shard_layout(&epoch_id).unwrap();
+
         let shard_id_state_root_list = match (self.shard_id, self.state_root) {
-            (None, None) => state_roots.into_iter().enumerate().collect(),
-            (Some(shard_id), Some(state_root)) => vec![(shard_id as usize, state_root)],
+            (None, None) => {
+                let mut result = vec![];
+                for (shard_index, state_root) in state_roots.into_iter().enumerate() {
+                    let shard_id = shard_layout.get_shard_id(shard_index);
+                    result.push((shard_id, state_root));
+                }
+                result
+            }
+            (Some(shard_id), Some(state_root)) => vec![(shard_id, state_root)],
             _ => {
                 panic!("Both shard_id and state_root must be provided");
             }
@@ -90,7 +103,6 @@ impl BootstrapCmd {
 
         let &prev_hash = block_header.prev_hash();
         for (shard_id, state_root) in shard_id_state_root_list {
-            let shard_id = shard_id as ShardId;
             Self::run_impl(
                 epoch_manager.as_ref(),
                 runtime.as_ref(),
@@ -189,6 +201,8 @@ impl PrepareBenchmarkCmd {
 
         for _ in 0..self.receipt_count {
             let receipt = self.create_receipt();
+            let receipt = Cow::Borrowed(&receipt);
+            let receipt = ReceiptOrStateStoredReceipt::Receipt(receipt);
             queue.push(&mut trie_update, &receipt).unwrap();
         }
 

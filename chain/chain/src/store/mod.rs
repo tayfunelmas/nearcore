@@ -40,6 +40,7 @@ use near_primitives::utils::{
 };
 use near_primitives::version::ProtocolVersion;
 use near_primitives::views::LightClientBlockView;
+use near_store::adapter::{StoreAdapter, StoreUpdateAdapter};
 use near_store::{
     DBCol, KeyForStateChanges, PartialStorage, Store, StoreUpdate, WrappedTrieChanges,
     CHUNK_TAIL_KEY, FINAL_HEAD_KEY, FORK_TAIL_KEY, HEADER_HEAD_KEY, HEAD_KEY,
@@ -47,7 +48,6 @@ use near_store::{
 };
 
 use crate::byzantine_assert;
-use crate::chunks_store::ReadOnlyChunksStore;
 use crate::types::{Block, BlockHeader, LatestKnown};
 use near_store::db::{StoreStatistics, STATE_SYNC_DUMP_KEY};
 use std::sync::Arc;
@@ -210,20 +210,22 @@ pub trait ChainStoreAccess {
     fn get_incoming_receipts_for_shard(
         &self,
         epoch_manager: &dyn EpochManagerAdapter,
-        mut shard_id: ShardId,
-        mut block_hash: CryptoHash,
+        target_shard_id: ShardId,
+        target_shard_layout: &ShardLayout,
+        block_hash: CryptoHash,
         last_chunk_height_included: BlockHeight,
     ) -> Result<Vec<ReceiptProofResponse>, Error> {
         let _span =
-            tracing::debug_span!(target: "chain", "get_incoming_receipts_for_shard", ?shard_id, ?block_hash, last_chunk_height_included).entered();
+            tracing::debug_span!(target: "chain", "get_incoming_receipts_for_shard", ?target_shard_id, ?block_hash, last_chunk_height_included).entered();
 
         let mut ret = vec![];
 
-        let target_shard_id = shard_id;
-        let target_shard_layout = epoch_manager.get_shard_layout_from_prev_block(&block_hash)?;
+        let mut current_shard_id = target_shard_id;
+        let mut current_block_hash = block_hash;
+        let mut current_shard_layout = target_shard_layout.clone();
 
         loop {
-            let header = self.get_block_header(&block_hash)?;
+            let header = self.get_block_header(&current_block_hash)?;
 
             if header.height() < last_chunk_height_included {
                 panic!("get_incoming_receipts_for_shard failed");
@@ -234,23 +236,23 @@ pub trait ChainStoreAccess {
             }
 
             let prev_hash = header.prev_hash();
-            let shard_layout = epoch_manager.get_shard_layout_from_prev_block(&block_hash)?;
             let prev_shard_layout = epoch_manager.get_shard_layout_from_prev_block(prev_hash)?;
 
-            if shard_layout != prev_shard_layout {
-                let parent_shard_id = shard_layout.get_parent_shard_id(shard_id)?;
-                tracing::debug!(
+            if prev_shard_layout != current_shard_layout {
+                let parent_shard_id = current_shard_layout.get_parent_shard_id(current_shard_id)?;
+                tracing::info!(
                     target: "chain",
-                    version = shard_layout.version(),
+                    version = current_shard_layout.version(),
                     prev_version = prev_shard_layout.version(),
-                    shard_id,
-                    parent_shard_id,
+                    ?current_shard_id,
+                    ?parent_shard_id,
                     "crossing epoch boundary with shard layout change, updating shard id"
                 );
-                shard_id = parent_shard_id;
+                current_shard_id = parent_shard_id;
+                current_shard_layout = prev_shard_layout;
             }
 
-            let receipts_proofs = self.get_incoming_receipts(&block_hash, shard_id);
+            let receipts_proofs = self.get_incoming_receipts(&current_block_hash, current_shard_id);
             match receipts_proofs {
                 Ok(receipt_proofs) => {
                     tracing::debug!(
@@ -262,12 +264,15 @@ pub trait ChainStoreAccess {
                     // make sure we only include receipts where receiver belongs
                     // to the target shard id in the target shard layout.
                     let filtered_receipt_proofs = filter_incoming_receipts_for_shard(
-                        &target_shard_layout,
+                        target_shard_layout,
                         target_shard_id,
                         receipt_proofs,
                     );
 
-                    ret.push(ReceiptProofResponse(block_hash, filtered_receipt_proofs.into()));
+                    ret.push(ReceiptProofResponse(
+                        current_block_hash,
+                        filtered_receipt_proofs.into(),
+                    ));
                 }
                 Err(err) => {
                     tracing::debug!(
@@ -281,11 +286,11 @@ pub trait ChainStoreAccess {
                     // incoming receipts. It would be nicer to explicitly check
                     // that condition rather than relying on errors when reading
                     // from the db.
-                    ret.push(ReceiptProofResponse(block_hash, Arc::new(vec![])));
+                    ret.push(ReceiptProofResponse(current_block_hash, Arc::new(vec![])));
                 }
             }
 
-            block_hash = *prev_hash;
+            current_block_hash = *prev_hash;
         }
 
         Ok(ret)
@@ -349,18 +354,22 @@ pub trait ChainStoreAccess {
         shard_id: ShardId,
     ) -> Result<EpochId, Error> {
         let mut candidate_hash = *hash;
+        let block_header = self.get_block_header(&candidate_hash)?;
+        let shard_layout = epoch_manager.get_shard_layout(block_header.epoch_id())?;
         let mut shard_id = shard_id;
+        let mut shard_index = shard_layout.get_shard_index(shard_id);
         loop {
             let block_header = self.get_block_header(&candidate_hash)?;
             if *block_header
                 .chunk_mask()
-                .get(shard_id as usize)
-                .ok_or_else(|| Error::InvalidShardId(shard_id as ShardId))?
+                .get(shard_index)
+                .ok_or_else(|| Error::InvalidShardId(shard_id))?
             {
                 break Ok(*block_header.epoch_id());
             }
             candidate_hash = *block_header.prev_hash();
-            shard_id = epoch_manager.get_prev_shard_ids(&candidate_hash, vec![shard_id])?[0];
+            (shard_id, shard_index) =
+                epoch_manager.get_prev_shard_ids(&candidate_hash, vec![shard_id])?[0];
         }
     }
 }
@@ -370,7 +379,7 @@ pub trait ChainStoreAccess {
 /// incoming receipts and the shard layout changed.
 fn filter_incoming_receipts_for_shard(
     target_shard_layout: &ShardLayout,
-    target_shard_id: u64,
+    target_shard_id: ShardId,
     receipt_proofs: Arc<Vec<ReceiptProof>>,
 ) -> Vec<ReceiptProof> {
     let mut filtered_receipt_proofs = vec![];
@@ -494,10 +503,6 @@ impl ChainStore {
         }
     }
 
-    pub fn new_read_only_chunks_store(&self) -> ReadOnlyChunksStore {
-        ReadOnlyChunksStore::new(self.store.clone())
-    }
-
     pub fn store_update(&mut self) -> ChainStoreUpdate<'_> {
         ChainStoreUpdate::new(self)
     }
@@ -590,10 +595,10 @@ impl ChainStore {
         receipts: &mut Vec<Receipt>,
         protocol_version: ProtocolVersion,
         shard_layout: &ShardLayout,
-        shard_id: u64,
-        receipts_shard_id: u64,
+        shard_id: ShardId,
+        receipts_shard_id: ShardId,
     ) -> Result<(), Error> {
-        tracing::trace!(target: "resharding", ?protocol_version, shard_id, receipts_shard_id, "reassign_outgoing_receipts_for_resharding");
+        tracing::trace!(target: "resharding", ?protocol_version, ?shard_id, ?receipts_shard_id, "reassign_outgoing_receipts_for_resharding");
         // If simple nightshade v2 is enabled and stable use that.
         // Same reassignment of outgoing receipts works for simple nightshade v3
         if checked_feature!("stable", SimpleNightshadeV2, protocol_version) {
@@ -2177,9 +2182,9 @@ impl<'a> ChainStoreUpdate<'a> {
                 source_store.get_chunk_extra(block_hash, &shard_uid)?.clone(),
             );
         }
-        for (shard_id, chunk_header) in block.chunks().iter().enumerate() {
+        for (shard_index, chunk_header) in block.chunks().iter().enumerate() {
+            let shard_id = shard_layout.get_shard_id(shard_index);
             let chunk_hash = chunk_header.chunk_hash();
-            let shard_id = shard_id as u64;
             chain_store_update
                 .chain_store_cache_update
                 .chunks
@@ -2467,17 +2472,15 @@ impl<'a> ChainStoreUpdate<'a> {
         // from the store.
         {
             let _span = tracing::trace_span!(target: "store", "write_trie_changes").entered();
-            let mut deletions_store_update = self.store().store_update();
+            let mut deletions_store_update = self.store().trie_store().store_update();
             for mut wrapped_trie_changes in self.trie_changes.drain(..) {
                 wrapped_trie_changes.apply_mem_changes();
-                wrapped_trie_changes.insertions_into(&mut store_update);
+                wrapped_trie_changes.insertions_into(&mut store_update.trie_store_update());
                 wrapped_trie_changes.deletions_into(&mut deletions_store_update);
-                wrapped_trie_changes.state_changes_into(&mut store_update);
+                wrapped_trie_changes.state_changes_into(&mut store_update.trie_store_update());
 
                 if self.chain_store.save_trie_changes {
-                    wrapped_trie_changes
-                        .trie_changes_into(&mut store_update)
-                        .map_err(|err| Error::Other(err.to_string()))?;
+                    wrapped_trie_changes.trie_changes_into(&mut store_update.trie_store_update());
                 }
             }
 
