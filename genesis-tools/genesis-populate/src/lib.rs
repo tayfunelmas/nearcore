@@ -19,13 +19,13 @@ use near_primitives::shard_layout::{account_id_to_shard_id, ShardUId};
 use near_primitives::state_record::StateRecord;
 use near_primitives::types::chunk_extra::ChunkExtra;
 use near_primitives::types::{
-    new_shard_id_tmp, shard_id_as_u32, AccountId, Balance, EpochId, ShardId, StateChangeCause,
-    StateRoot,
+    shard_id_as_u32, AccountId, Balance, EpochId, ShardId, StateChangeCause, StateRoot,
 };
 use near_primitives::utils::to_timestamp;
 use near_primitives::version::ProtocolFeature;
 use near_store::adapter::StoreUpdateAdapter;
 use near_store::genesis::{compute_storage_usage, initialize_genesis_state};
+use near_store::trie::update::TrieUpdateResult;
 use near_store::{
     get_account, get_genesis_state_roots, set_access_key, set_account, set_code, Store, TrieUpdate,
 };
@@ -138,7 +138,7 @@ impl GenesisBuilder {
             .expect("genesis state roots not initialized.");
         let genesis_shard_version = self.genesis.config.shard_layout.version();
         self.roots =
-            roots.into_iter().enumerate().map(|(k, v)| (new_shard_id_tmp(k as u64), v)).collect();
+            roots.into_iter().enumerate().map(|(k, v)| (ShardId::new(k as u64), v)).collect();
         self.state_updates = self
             .roots
             .iter()
@@ -205,7 +205,7 @@ impl GenesisBuilder {
         }
         let tries = self.runtime.get_tries();
         state_update.commit(StateChangeCause::InitialState);
-        let (_, trie_changes, state_changes) = state_update.finalize()?;
+        let TrieUpdateResult { trie_changes, state_changes, .. } = state_update.finalize()?;
         let genesis_shard_version = self.genesis.config.shard_layout.version();
         let shard_uid =
             ShardUId { version: genesis_shard_version, shard_id: shard_id_as_u32(shard_idx) };

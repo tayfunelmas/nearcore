@@ -466,6 +466,8 @@ impl NightshadeRuntime {
             processed_yield_timeouts: apply_result.processed_yield_timeouts,
             applied_receipts_hash: hash(&borsh::to_vec(receipts).unwrap()),
             congestion_info: apply_result.congestion_info,
+            contract_accesses: apply_result.contract_accesses,
+            contract_deploys: apply_result.contract_deploys,
         };
 
         Ok(result)
@@ -1339,6 +1341,10 @@ impl RuntimeAdapter for NightshadeRuntime {
     fn will_shard_layout_change_next_epoch(&self, parent_hash: &CryptoHash) -> Result<bool, Error> {
         let epoch_manager = self.epoch_manager.read();
         Ok(epoch_manager.will_shard_layout_change(parent_hash)?)
+    }
+
+    fn compiled_contract_cache(&self) -> &dyn ContractRuntimeCache {
+        self.compiled_contract_cache.as_ref()
     }
 }
 

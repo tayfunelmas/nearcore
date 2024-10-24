@@ -1,8 +1,8 @@
 use near_o11y::metrics::{
-    exponential_buckets, linear_buckets, try_create_counter, try_create_gauge,
-    try_create_histogram, try_create_histogram_vec, try_create_int_counter,
-    try_create_int_counter_vec, try_create_int_gauge, try_create_int_gauge_vec, Counter, Gauge,
-    Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
+    exponential_buckets, linear_buckets, try_create_counter, try_create_counter_vec,
+    try_create_gauge, try_create_histogram, try_create_histogram_vec, try_create_int_counter,
+    try_create_int_counter_vec, try_create_int_gauge, try_create_int_gauge_vec, Counter,
+    CounterVec, Gauge, Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
 use std::sync::LazyLock;
 
@@ -445,6 +445,15 @@ pub(crate) fn export_version(neard_version: &near_primitives::version::Version) 
         .inc();
 }
 
+pub(crate) static EPOCH_SYNC_LAST_GENERATED_COMPRESSED_PROOF_SIZE: LazyLock<IntGauge> =
+    LazyLock::new(|| {
+        try_create_int_gauge(
+            "near_epoch_sync_last_generated_compressed_proof_size",
+            "Size of the last generated compressed epoch sync proof, in bytes",
+        )
+        .unwrap()
+    });
+
 pub(crate) static STATE_SYNC_STAGE: LazyLock<IntGaugeVec> = LazyLock::new(|| {
     try_create_int_gauge_vec(
         "near_state_sync_stage",
@@ -628,3 +637,35 @@ pub(crate) static PARTIAL_WITNESS_CACHE_SIZE: LazyLock<Gauge> = LazyLock::new(||
     )
     .unwrap()
 });
+
+pub(crate) static RECEIVE_WITNESS_ACCESSED_CONTRACT_CODES_TIME: LazyLock<HistogramVec> =
+    LazyLock::new(|| {
+        try_create_histogram_vec(
+            "near_receive_witness_accessed_contract_codes_time",
+            "Time it takes to retrieve missing contract codes",
+            &["shard_id"],
+            Some(linear_buckets(0.025, 0.025, 40).unwrap()),
+        )
+        .unwrap()
+    });
+
+pub(crate) static WITNESS_ACCESSED_CONTRACT_CODES_DELAY: LazyLock<HistogramVec> =
+    LazyLock::new(|| {
+        try_create_histogram_vec(
+            "near_witness_accessed_contract_codes_delay",
+            "Delay in witness processing caused by waiting for accessed contract codes",
+            &["shard_id"],
+            Some(linear_buckets(0.025, 0.025, 40).unwrap()),
+        )
+        .unwrap()
+    });
+
+pub(crate) static DECODE_PARTIAL_WITNESS_ACCESSED_CONTRACTS_STATE_COUNT: LazyLock<CounterVec> =
+    LazyLock::new(|| {
+        try_create_counter_vec(
+            "near_decode_partial_witness_accessed_contracts_state_count",
+            "State of the accessed contracts when collected enough parts to decode the witness",
+            &["shard_id", "state"],
+        )
+        .unwrap()
+    });

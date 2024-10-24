@@ -4034,8 +4034,8 @@ dependencies = [
  "tempfile",
  "thiserror",
  "time",
+ "tokio",
  "tracing",
- "yansi",
 ]
 
 [[package]]
@@ -4193,7 +4193,6 @@ dependencies = [
  "thiserror",
  "time",
  "tracing",
- "yansi",
 ]
 
 [[package]]
@@ -7446,6 +7445,7 @@ version = "0.0.0"
 dependencies = [
  "borsh 1.2.0",
  "clap",
+ "near-async",
  "near-chain",
  "near-chain-configs",
  "near-chain-primitives",
@@ -7501,6 +7501,7 @@ dependencies = [
  "near-client",
  "near-crypto",
  "near-epoch-manager",
+ "near-jsonrpc",
  "near-network",
  "near-o11y",
  "near-primitives",
