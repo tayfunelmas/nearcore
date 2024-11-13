@@ -175,6 +175,32 @@ pub type DBIteratorItem = io::Result<(Box<[u8]>, Box<[u8]>)>;
 pub type DBIterator<'a> = Box<dyn Iterator<Item = DBIteratorItem> + 'a>;
 
 pub trait Database: Sync + Send {
+    fn multi_get_raw_bytes(
+        &self,
+        col: DBCol,
+        keys: Vec<&[u8]>,
+    ) -> io::Result<Vec<Option<DBSlice<'_>>>> {
+        let values = keys
+            .into_iter()
+            .map(|key| self.get_raw_bytes(col, key))
+            .collect::<io::Result<Vec<_>>>()?;
+        Ok(values)
+    }
+
+    fn multi_get_with_rc_stripped(
+        &self,
+        col: DBCol,
+        keys: Vec<&[u8]>,
+    ) -> io::Result<Vec<Option<DBSlice<'_>>>> {
+        assert!(col.is_rc());
+        let values = self
+            .multi_get_raw_bytes(col, keys)?
+            .into_iter()
+            .map(|value| value.map(|value| value.strip_refcount().unwrap()))
+            .collect();
+        Ok(values)
+    }
+
     /// Returns raw bytes for given `key` ignoring any reference count decoding
     /// if any.
     ///
