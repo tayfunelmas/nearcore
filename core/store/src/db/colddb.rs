@@ -41,6 +41,24 @@ impl ColdDB {
 }
 
 impl Database for ColdDB {
+    fn multi_get_raw_bytes(
+        &self,
+        col: DBCol,
+        keys: Vec<&[u8]>,
+    ) -> std::io::Result<Vec<Option<DBSlice<'_>>>> {
+        Self::check_is_in_colddb(col)?;
+        self.cold.multi_get_raw_bytes(col, keys)
+    }
+
+    fn multi_get_with_rc_stripped(
+        &self,
+        col: DBCol,
+        keys: Vec<&[u8]>,
+    ) -> std::io::Result<Vec<Option<DBSlice<'_>>>> {
+        Self::check_is_in_colddb(col)?;
+        self.cold.multi_get_with_rc_stripped(col, keys)
+    }
+
     /// Returns raw bytes for given `key` ignoring any reference count decoding if any.
     fn get_raw_bytes(&self, col: DBCol, key: &[u8]) -> std::io::Result<Option<DBSlice<'_>>> {
         Self::check_is_in_colddb(col)?;
