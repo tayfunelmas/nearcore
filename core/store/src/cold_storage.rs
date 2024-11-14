@@ -3,6 +3,7 @@ use crate::db::{ColdDB, COLD_HEAD_KEY, HEAD_KEY};
 use crate::{metrics, DBCol, DBTransaction, Database, Store, TrieChanges};
 
 use borsh::BorshDeserialize;
+use itertools::Itertools;
 use near_primitives::block::{Block, BlockHeader, Tip};
 use near_primitives::hash::CryptoHash;
 use near_primitives::shard_layout::ShardLayout;
@@ -27,6 +28,8 @@ pub trait ColdMigrationStore {
     ) -> io::Result<()>;
 
     fn get_for_cold(&self, column: DBCol, key: &[u8]) -> io::Result<StoreValue>;
+
+    fn multi_get_for_cold(&self, column: DBCol, keys: Vec<&[u8]>) -> io::Result<Vec<StoreValue>>;
 
     fn get_ser_for_cold<T: BorshDeserialize>(
         &self,
@@ -168,22 +171,32 @@ fn copy_state_from_store(
     cold_db: &ColdDB,
     hot_store: &Store,
 ) -> io::Result<()> {
+    debug_assert_eq!(DBCol::TrieChanges.key_type(), &[DBKeyType::BlockHash, DBKeyType::ShardUId]);
+
     let col = DBCol::State;
     let _span = tracing::debug_span!(target: "cold_store", "copy_state_from_store", %col);
     let instant = std::time::Instant::now();
 
+    let trie_changes_keys = shard_layout
+        .shard_uids()
+        .map(|shard_uid| {
+            let shard_uid_key = shard_uid.to_bytes();
+            let key = join_two_keys(&block_hash_key, &shard_uid_key);
+            (shard_uid_key, key)
+        })
+        .collect_vec();
+
+    let values = hot_store.multi_get_for_cold(
+        DBCol::TrieChanges,
+        trie_changes_keys.iter().map(|(_, key)| key.as_slice()).collect(),
+    )?;
+
     let mut transaction = DBTransaction::new();
-    for shard_uid in shard_layout.shard_uids() {
-        debug_assert_eq!(
-            DBCol::TrieChanges.key_type(),
-            &[DBKeyType::BlockHash, DBKeyType::ShardUId]
-        );
-
-        let shard_uid_key = shard_uid.to_bytes();
-        let key = join_two_keys(&block_hash_key, &shard_uid_key);
-        let trie_changes: Option<TrieChanges> =
-            hot_store.get_ser::<TrieChanges>(DBCol::TrieChanges, &key)?;
-
+    for ((shard_uid_key, _), trie_changes_data) in
+        trie_changes_keys.into_iter().zip_eq(values.into_iter())
+    {
+        let trie_changes =
+            trie_changes_data.map(|data| TrieChanges::try_from_slice(&data)).transpose()?;
         let Some(trie_changes) = trie_changes else { continue };
         for op in trie_changes.insertions() {
             // TODO(reshardingV3) Handle shard_uid not mapped there
@@ -226,12 +239,10 @@ fn copy_from_store(
     let mut transaction = DBTransaction::new();
     let mut good_keys = 0;
     let total_keys = keys.len();
-    for key in keys {
-        // TODO: Look into using RocksDB’s multi_key function.  It
-        // might speed things up.  Currently our Database abstraction
-        // doesn’t offer interface for it so that would need to be
-        // added.
-        let data = hot_store.get_for_cold(col, &key)?;
+
+    let values = hot_store.multi_get_for_cold(col, keys.iter().map(Vec::as_slice).collect())?;
+
+    for (key, data) in keys.into_iter().zip_eq(values.into_iter()) {
         if let Some(value) = data {
             // TODO: As an optimisation, we might consider breaking the
             // abstraction layer.  Since we’re always writing to cold database,
@@ -550,6 +561,15 @@ impl ColdMigrationStore for Store {
     fn get_for_cold(&self, column: DBCol, key: &[u8]) -> io::Result<StoreValue> {
         crate::metrics::COLD_MIGRATION_READS.with_label_values(&[<&str>::from(column)]).inc();
         Ok(self.get(column, key)?.map(|x| x.as_slice().to_vec()))
+    }
+
+    fn multi_get_for_cold(&self, column: DBCol, keys: Vec<&[u8]>) -> io::Result<Vec<StoreValue>> {
+        crate::metrics::COLD_MIGRATION_READS.with_label_values(&[<&str>::from(column)]).inc();
+        Ok(self
+            .multi_get(column, keys)?
+            .into_iter()
+            .map(|x| x.map(|x| x.as_slice().to_vec()))
+            .collect_vec())
     }
 
     fn get_ser_for_cold<T: BorshDeserialize>(
