@@ -172,10 +172,8 @@ fn copy_state_from_store(
     hot_store: &Store,
 ) -> io::Result<()> {
     debug_assert_eq!(DBCol::TrieChanges.key_type(), &[DBKeyType::BlockHash, DBKeyType::ShardUId]);
-
     let col = DBCol::State;
     let _span = tracing::debug_span!(target: "cold_store", "copy_state_from_store", %col);
-    let instant = std::time::Instant::now();
 
     let trie_changes_keys = shard_layout
         .shard_uids()
@@ -185,6 +183,11 @@ fn copy_state_from_store(
             (shard_uid_key, key)
         })
         .collect_vec();
+    if trie_changes_keys.is_empty() {
+        tracing::trace!(target: "cold_store", ?col, "no shards to copy state from store");
+        return Ok(());
+    }
+    let instant = std::time::Instant::now();
 
     let values = hot_store.multi_get_for_cold(
         DBCol::TrieChanges,
@@ -234,14 +237,18 @@ fn copy_from_store(
     // needed to copy state records from genesis
 
     let _span = tracing::debug_span!(target: "cold_store", "copy_from_store", col = %col);
-    let instant = std::time::Instant::now();
 
-    let mut transaction = DBTransaction::new();
-    let mut good_keys = 0;
     let total_keys = keys.len();
+    if total_keys == 0 {
+        tracing::trace!(target: "cold_store", ?col, "no keys to copy from store");
+        return Ok(());
+    }
+    let instant = std::time::Instant::now();
 
     let values = hot_store.multi_get_for_cold(col, keys.iter().map(Vec::as_slice).collect())?;
 
+    let mut transaction = DBTransaction::new();
+    let mut good_keys = 0;
     for (key, data) in keys.into_iter().zip_eq(values.into_iter()) {
         if let Some(value) = data {
             // TODO: As an optimisation, we might consider breaking the
@@ -564,6 +571,11 @@ impl ColdMigrationStore for Store {
     }
 
     fn multi_get_for_cold(&self, column: DBCol, keys: Vec<&[u8]>) -> io::Result<Vec<StoreValue>> {
+        let num_keys = keys.len();
+        debug_assert!(num_keys > 0, "No keys provided to multi_get");
+        if num_keys == 1 {
+            return self.get_for_cold(column, keys[0]).map(|x| vec![x]);
+        }
         crate::metrics::COLD_MIGRATION_READS.with_label_values(&[<&str>::from(column)]).inc();
         Ok(self
             .multi_get(column, keys)?

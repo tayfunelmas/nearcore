@@ -180,6 +180,7 @@ pub trait Database: Sync + Send {
         col: DBCol,
         keys: Vec<&[u8]>,
     ) -> io::Result<Vec<Option<DBSlice<'_>>>> {
+        debug_assert!(keys.len() > 1, "Multiple keys must be provided, found {} keys", keys.len());
         let values = keys
             .into_iter()
             .map(|key| self.get_raw_bytes(col, key))
@@ -193,6 +194,7 @@ pub trait Database: Sync + Send {
         keys: Vec<&[u8]>,
     ) -> io::Result<Vec<Option<DBSlice<'_>>>> {
         assert!(col.is_rc());
+        debug_assert!(keys.len() > 1, "Multiple keys must be provided, found {} keys", keys.len());
         let values = self
             .multi_get_raw_bytes(col, keys)?
             .into_iter()

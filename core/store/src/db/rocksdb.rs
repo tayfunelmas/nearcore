@@ -350,6 +350,7 @@ impl Database for RocksDB {
         col: DBCol,
         keys: Vec<&[u8]>,
     ) -> io::Result<Vec<Option<DBSlice<'_>>>> {
+        debug_assert!(keys.len() > 1, "Multiple keys must be provided, found {} keys", keys.len());
         let timer = metrics::DATABASE_OP_LATENCY_HIST
             .with_label_values(&["multiget", col.into()])
             .start_timer();
