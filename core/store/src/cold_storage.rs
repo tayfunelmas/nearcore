@@ -217,7 +217,7 @@ fn copy_state_from_store(
     cold_db.write(transaction)?;
     let write_duration = instant.elapsed();
 
-    tracing::trace!(target: "cold_store", ?read_duration, ?write_duration, "finished");
+    tracing::trace!(target: "cold_store", ?col, ?read_duration, ?write_duration, "copy_state_from_store finished");
 
     Ok(())
 }
@@ -269,7 +269,7 @@ fn copy_from_store(
     cold_db.write(transaction)?;
     let write_duration = instant.elapsed();
 
-    tracing::trace!(target: "cold_store", ?col, ?good_keys, ?total_keys, ?read_duration, ?write_duration, "finished");
+    tracing::trace!(target: "cold_store", ?col, ?good_keys, ?total_keys, ?read_duration, ?write_duration, "copy_from_store finished");
 
     return Ok(());
 }
