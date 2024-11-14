@@ -190,7 +190,6 @@ fn copy_state_from_store(
             let key = join_two_keys(&shard_uid_key, op.hash().as_bytes());
             let value = op.payload().to_vec();
 
-            tracing::trace!(target: "cold_store", pretty_key=?near_fmt::StorageKey(&key), "copying state node to colddb");
             rc_aware_set(&mut transaction, DBCol::State, key, value);
         }
     }
@@ -201,7 +200,7 @@ fn copy_state_from_store(
     cold_db.write(transaction)?;
     let write_duration = instant.elapsed();
 
-    tracing::trace!(target: "cold_store", ?read_duration, ?write_duration, "finished");
+    tracing::trace!(target: "cold_store", ?col, ?read_duration, ?write_duration, "copy_state_from_store finished");
 
     Ok(())
 }
@@ -251,7 +250,7 @@ fn copy_from_store(
     cold_db.write(transaction)?;
     let write_duration = instant.elapsed();
 
-    tracing::trace!(target: "cold_store", ?col, ?good_keys, ?total_keys, ?read_duration, ?write_duration, "finished");
+    tracing::trace!(target: "cold_store", ?col, ?good_keys, ?total_keys, ?read_duration, ?write_duration, "copy_from_store finished");
 
     return Ok(());
 }
